@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微信账单分析工具</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-content">
+                <h1>📊 微信账单分析工具</h1>
+                <p class="subtitle">可视化分析您的微信支付账单数据</p>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <h3>📁 数据导入</h3>
+                    <button id="selectFileBtn" class="btn btn-primary">
+                        <span class="btn-icon">📂</span>
+                        选择账单文件
+                    </button>
+                    <div id="fileInfo" class="file-info hidden">
+                        <p class="file-name"></p>
+                        <p class="file-status"></p>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3>📈 功能导航</h3>
+                    <nav class="nav-menu">
+                        <button class="nav-item active" data-view="overview">
+                            <span class="nav-icon">📊</span>
+                            数据概览
+                        </button>
+                        <button class="nav-item" data-view="analysis">
+                            <span class="nav-icon">📉</span>
+                            统计分析
+                        </button>
+                        <button class="nav-item" data-view="category">
+                            <span class="nav-icon">🏷️</span>
+                            分类汇总
+                        </button>
+                        <button class="nav-item" data-view="trend">
+                            <span class="nav-icon">📈</span>
+                            趋势分析
+                        </button>
+                        <button class="nav-item" data-view="detail">
+                            <span class="nav-icon">📋</span>
+                            明细查询
+                        </button>
+                    </nav>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3>⚙️ 操作</h3>
+                    <button id="exportReportBtn" class="btn btn-secondary" disabled>
+                        <span class="btn-icon">💾</span>
+                        导出报告
+                    </button>
+                    <button id="helpBtn" class="btn btn-secondary">
+                        <span class="btn-icon">❓</span>
+                        使用帮助
+                    </button>
+                </div>
+            </aside>
+
+            <main class="content-area">
+                <div id="welcomeView" class="view-container active">
+                    <div class="welcome-card">
+                        <h2>欢迎使用微信账单分析工具</h2>
+                        <div class="welcome-content">
+                            <div class="feature-list">
+                                <div class="feature-item">
+                                    <span class="feature-icon">📊</span>
+                                    <h3>数据概览</h3>
+                                    <p>快速查看收支总览、交易统计等关键指标</p>
+                                </div>
+                                <div class="feature-item">
+                                    <span class="feature-icon">📉</span>
+                                    <h3>统计分析</h3>
+                                    <p>深度分析消费习惯、支付方式分布</p>
+                                </div>
+                                <div class="feature-item">
+                                    <span class="feature-icon">🏷️</span>
+                                    <h3>分类汇总</h3>
+                                    <p>按商户、类型等维度汇总分析</p>
+                                </div>
+                                <div class="feature-item">
+                                    <span class="feature-icon">📈</span>
+                                    <h3>趋势分析</h3>
+                                    <p>可视化展示消费趋势变化</p>
+                                </div>
+                            </div>
+                            <div class="getting-started">
+                                <h3>🚀 快速开始</h3>
+                                <ol>
+                                    <li>点击左侧"选择账单文件"按钮</li>
+                                    <li>选择从微信导出的账单Excel文件</li>
+                                    <li>系统自动解析并展示分析结果</li>
+                                </ol>
+                                <button id="howToGetBillBtn" class="btn btn-link">
+                                    📖 如何获取微信账单？
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="overviewView" class="view-container">
+                    <h2 class="view-title">📊 数据概览</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon income">💰</div>
+                            <div class="stat-content">
+                                <p class="stat-label">总收入</p>
+                                <p class="stat-value" id="totalIncome">¥0.00</p>
+                                <p class="stat-detail" id="incomeCount">0笔</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon expense">💸</div>
+                            <div class="stat-content">
+                                <p class="stat-label">总支出</p>
+                                <p class="stat-value" id="totalExpense">¥0.00</p>
+                                <p class="stat-detail" id="expenseCount">0笔</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon balance">📊</div>
+                            <div class="stat-content">
+                                <p class="stat-label">净收支</p>
+                                <p class="stat-value" id="netBalance">¥0.00</p>
+                                <p class="stat-detail" id="balanceStatus">-</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon total">📝</div>
+                            <div class="stat-content">
+                                <p class="stat-label">总交易</p>
+                                <p class="stat-value" id="totalTransactions">0</p>
+                                <p class="stat-detail" id="dateRange">-</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>收支对比</h3>
+                        <canvas id="incomeExpenseChart"></canvas>
+                    </div>
+
+                    <div class="info-section">
+                        <h3>账单信息</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">微信昵称：</span>
+                                <span class="info-value" id="metaNickname">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">账单时间：</span>
+                                <span class="info-value" id="metaDateRange">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">导出时间：</span>
+                                <span class="info-value" id="metaExportTime">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">导出类型：</span>
+                                <span class="info-value" id="metaExportType">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="analysisView" class="view-container">
+                    <h2 class="view-title">📉 统计分析</h2>
+                    
+                    <div class="analysis-section">
+                        <h3>支付方式分布</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="paymentMethodChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="analysis-section">
+                        <h3>交易类型分布</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="transactionTypeChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="analysis-section">
+                        <h3>交易状态统计</h3>
+                        <div id="statusStats" class="stats-table"></div>
+                    </div>
+                </div>
+
+                <div id="categoryView" class="view-container">
+                    <h2 class="view-title">🏷️ 分类汇总</h2>
+                    
+                    <div class="filter-bar">
+                        <label>
+                            <span>分类维度：</span>
+                            <select id="categoryDimension">
+                                <option value="merchant">按商户</option>
+                                <option value="type">按交易类型</option>
+                                <option value="paymentMethod">按支付方式</option>
+                            </select>
+                        </label>
+                        <label>
+                            <span>排序方式：</span>
+                            <select id="categorySortBy">
+                                <option value="amount">按金额</option>
+                                <option value="count">按次数</option>
+                            </select>
+                        </label>
+                        <label>
+                            <span>显示数量：</span>
+                            <select id="categoryTopN">
+                                <option value="10">前10名</option>
+                                <option value="20">前20名</option>
+                                <option value="50">前50名</option>
+                                <option value="all">全部</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="category-results">
+                        <div class="chart-wrapper">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+                        <div id="categoryTable" class="data-table"></div>
+                    </div>
+                </div>
+
+                <div id="trendView" class="view-container">
+                    <h2 class="view-title">📈 趋势分析</h2>
+                    
+                    <div class="filter-bar">
+                        <label>
+                            <span>时间粒度：</span>
+                            <select id="trendGranularity">
+                                <option value="daily">按日</option>
+                                <option value="weekly">按周</option>
+                                <option value="monthly">按月</option>
+                            </select>
+                        </label>
+                        <label>
+                            <span>数据类型：</span>
+                            <select id="trendDataType">
+                                <option value="both">收入+支出</option>
+                                <option value="income">仅收入</option>
+                                <option value="expense">仅支出</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="trend-results">
+                        <div class="chart-wrapper large">
+                            <canvas id="trendChart"></canvas>
+                        </div>
+                        <div class="trend-stats">
+                            <div class="trend-stat-card">
+                                <h4>日均支出</h4>
+                                <p class="trend-value" id="avgDailyExpense">¥0.00</p>
+                            </div>
+                            <div class="trend-stat-card">
+                                <h4>最高单日支出</h4>
+                                <p class="trend-value" id="maxDailyExpense">¥0.00</p>
+                                <p class="trend-date" id="maxExpenseDate">-</p>
+                            </div>
+                            <div class="trend-stat-card">
+                                <h4>最低单日支出</h4>
+                                <p class="trend-value" id="minDailyExpense">¥0.00</p>
+                                <p class="trend-date" id="minExpenseDate">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="detailView" class="view-container">
+                    <h2 class="view-title">📋 明细查询</h2>
+                    
+                    <div class="filter-bar">
+                        <input type="text" id="searchKeyword" placeholder="搜索商户、商品名称...">
+                        <select id="filterType">
+                            <option value="all">全部类型</option>
+                            <option value="income">收入</option>
+                            <option value="expense">支出</option>
+                        </select>
+                        <select id="filterStatus">
+                            <option value="all">全部状态</option>
+                            <option value="支付成功">支付成功</option>
+                            <option value="已退款">已退款</option>
+                        </select>
+                        <button id="searchBtn" class="btn btn-primary">🔍 搜索</button>
+                        <button id="resetFilterBtn" class="btn btn-secondary">🔄 重置</button>
+                    </div>
+
+                    <div class="detail-stats">
+                        <span>共找到 <strong id="filteredCount">0</strong> 条记录</span>
+                        <span>总金额：<strong id="filteredAmount">¥0.00</strong></span>
+                    </div>
+
+                    <div id="detailTable" class="data-table scrollable"></div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div id="helpModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <h2>📖 如何获取微信账单数据</h2>
+            <div class="help-content">
+                <h3>导出步骤：</h3>
+                <ol>
+                    <li>打开微信，进入 <strong>我 → 服务 → 钱包 → 账单</strong></li>
+                    <li>点击右上角 <strong>...</strong> 或 <strong>常见问题</strong>，选择 <strong>下载账单</strong></li>
+                    <li>选择账单用途为 <strong>"用于个人对账"</strong>
+                        <ul>
+                            <li>这样会生成 <strong>Excel或CSV格式</strong> 的文件</li>
+                            <li>（选择"用做证明材料"则会生成带公章的PDF，无法使用）</li>
+                        </ul>
+                    </li>
+                    <li>设置需要导出的时间范围（最长可导出1年内的数据）</li>
+                    <li>填写接收邮箱地址</li>
+                    <li>完成身份验证（输入支付密码）</li>
+                    <li>系统会在24小时内将加密压缩包发送至邮箱</li>
+                    <li>解压密码通过微信服务通知发送</li>
+                </ol>
+
+                <h3>数据格式说明：</h3>
+                <ul>
+                    <li>导出的文件包含：交易时间、交易类型、交易对方、商品、金额、收/支、支付方式、当前状态等字段</li>
+                    <li>文件前16行左右是表头和说明信息，实际数据从第17行开始</li>
+                    <li>本工具会自动识别并解析这些数据</li>
+                </ul>
+
+                <h3>注意事项：</h3>
+                <ul>
+                    <li>请确保选择"用于个人对账"选项，生成Excel格式文件</li>
+                    <li>PDF格式的账单无法被本工具解析</li>
+                    <li>建议定期导出账单进行备份和分析</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="renderer.js"></script>
+</body>
+</html>

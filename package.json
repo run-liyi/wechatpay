@@ -1,0 +1,79 @@
+{
+  "name": "wechat-bill-analyzer",
+  "version": "1.0.0",
+  "description": "微信账单分析工具 - 基于Electron框架的可视化账单分析应用",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "pack": "electron-packager . 微信账单分析工具 --platform=win32 --arch=x64 --out=release --overwrite --icon=assets/icon.ico"
+  },
+  "keywords": [
+    "wechat",
+    "bill",
+    "analyzer",
+    "electron",
+    "微信账单",
+    "数据分析"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "electron-packager": "^17.1.2"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.1",
+    "xlsx": "^0.18.5"
+  },
+  "build": {
+    "appId": "com.wechat.bill.analyzer",
+    "productName": "微信账单分析工具",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!**/*.md",
+      "!dist",
+      "!release"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "sign": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "微信账单分析工具"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "assets/icon.png"
+    }
+  }
+}

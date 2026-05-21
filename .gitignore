@@ -1,0 +1,17 @@
+node_modules/
+dist/
+release/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.iml
+package-lock.json
+yarn.lock
