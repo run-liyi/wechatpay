@@ -5,6 +5,20 @@ let metadata = {};
 let currentView = 'welcome';
 let charts = {};
 
+// Bill-file cell values (counterparty, product, status, etc.) are untrusted input.
+// They get interpolated into innerHTML below, and the renderer runs with Node
+// integration enabled, so an unescaped value is a remote-code-execution sink.
+// Escape the five HTML-significant characters before any such interpolation.
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[ch]);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     initializeApp();
 });
@@ -401,7 +415,7 @@ function renderStatusStats(stats) {
     stats.forEach(stat => {
         html += `
             <tr>
-                <td>${stat.name}</td>
+                <td>${escapeHtml(stat.name)}</td>
                 <td>${stat.count}</td>
                 <td>¥${stat.totalAmount.toFixed(2)}</td>
                 <td class="amount-income">¥${stat.incomeAmount.toFixed(2)}</td>
@@ -525,7 +539,7 @@ function renderCategoryTable(stats) {
         html += `
             <tr>
                 <td>${index + 1}</td>
-                <td>${stat.name}</td>
+                <td>${escapeHtml(stat.name)}</td>
                 <td>${stat.count}</td>
                 <td>¥${stat.totalAmount.toFixed(2)}</td>
                 <td class="amount-income">¥${stat.incomeAmount.toFixed(2)}</td>
@@ -752,14 +766,14 @@ function renderDetailTable(data) {
         
         html += `
             <tr>
-                <td>${record['交易时间'] || '-'}</td>
-                <td>${record['交易类型'] || '-'}</td>
-                <td>${record['交易对方'] || '-'}</td>
-                <td>${record['商品'] || '-'}</td>
-                <td>${record['收/支'] || '-'}</td>
+                <td>${escapeHtml(record['交易时间'] || '-')}</td>
+                <td>${escapeHtml(record['交易类型'] || '-')}</td>
+                <td>${escapeHtml(record['交易对方'] || '-')}</td>
+                <td>${escapeHtml(record['商品'] || '-')}</td>
+                <td>${escapeHtml(record['收/支'] || '-')}</td>
                 <td class="${amountClass}">¥${amount.toFixed(2)}</td>
-                <td>${record['支付方式'] || '-'}</td>
-                <td>${record['当前状态'] || '-'}</td>
+                <td>${escapeHtml(record['支付方式'] || '-')}</td>
+                <td>${escapeHtml(record['当前状态'] || '-')}</td>
             </tr>
         `;
     });
