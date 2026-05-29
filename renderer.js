@@ -668,19 +668,33 @@ function updateTrendStats(trendData) {
         return;
     }
 
-    const expenses = trendData.map(d => d.expense);
-    const avgExpense = expenses.reduce((a, b) => a + b, 0) / expenses.length;
-    const maxExpense = Math.max(...expenses);
-    const minExpense = Math.min(...expenses);
+    // 仅统计「确有支出」的区间，避免无支出日把最小值拉成 0、日期失真
+    const expenseEntries = trendData.filter(d => d.expense > 0);
+    if (expenseEntries.length === 0) {
+        // 全为收入或全无支出
+        setText('avgDailyExpense', '¥0.00');
+        setText('maxDailyExpense', '¥0.00');
+        setText('maxExpenseDate', '暂无支出');
+        setText('minDailyExpense', '¥0.00');
+        setText('minExpenseDate', '暂无支出');
+        return;
+    }
 
-    const maxIndex = expenses.indexOf(maxExpense);
-    const minIndex = expenses.indexOf(minExpense);
+    // 日均支出：总支出 ÷ 全部区间数（含无支出区间），口径与原实现一致
+    const avgExpense = trendData.reduce((s, d) => s + d.expense, 0) / trendData.length;
+
+    let maxEntry = expenseEntries[0];
+    let minEntry = expenseEntries[0];
+    for (const d of expenseEntries) {
+        if (d.expense > maxEntry.expense) maxEntry = d;
+        if (d.expense < minEntry.expense) minEntry = d;
+    }
 
     setText('avgDailyExpense', `¥${avgExpense.toFixed(2)}`);
-    setText('maxDailyExpense', `¥${maxExpense.toFixed(2)}`);
-    setText('maxExpenseDate', trendData[maxIndex].date);
-    setText('minDailyExpense', `¥${minExpense.toFixed(2)}`);
-    setText('minExpenseDate', trendData[minIndex].date);
+    setText('maxDailyExpense', `¥${maxEntry.expense.toFixed(2)}`);
+    setText('maxExpenseDate', maxEntry.date);
+    setText('minDailyExpense', `¥${minEntry.expense.toFixed(2)}`);
+    setText('minExpenseDate', minEntry.date);
 }
 
 function updateDetailView() {
