@@ -4,7 +4,7 @@ const fs = require('fs');
 const XLSX = require('xlsx');
 const iconv = require('iconv-lite');
 const { SecureStore } = require('./src/secure-store');
-const { extractSheetRecords, dedupeRecords } = require('./src/parse/bill-parser');
+const { parseSheets } = require('./src/import/parser');
 
 let secureStore = null;
 
@@ -128,32 +128,21 @@ ipcMain.handle('parse-bill-file', async (event, filePath) => {
   try {
     const workbook = buildWorkbook(filePath);
 
-    // 遍历工作簿的所有 sheet：账单可能被拆分到多个表（如分月导出），仅取第一个会漏数据
-    let allRecords = [];
-    let metadata = null;
-    let parsedSheetCount = 0;
-
+    // 主进程仅负责 I/O：把各 sheet 读为二维数组（单表异常隔离），纯解析逻辑交由 parser 模块
+    const rawSheets = [];
     for (const sheetName of workbook.SheetNames) {
-      // 单个 sheet 异常时跳过而非整体失败，避免一张坏表拖垮多 sheet 文件
       try {
-        const worksheet = workbook.Sheets[sheetName];
-        const rawData = XLSX.utils.sheet_to_json(worksheet, {
+        rawSheets.push(XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
           header: 1,
           raw: false,
           dateNF: 'yyyy-mm-dd hh:mm:ss'
-        });
-
-        const parsed = extractSheetRecords(rawData);
-        if (!parsed) continue; // 该 sheet 无账单表头，跳过
-
-        allRecords = allRecords.concat(parsed.records);
-        parsedSheetCount++;
-        // 元数据取首个含表头 sheet 的说明区
-        if (!metadata) metadata = extractMetadata(rawData, parsed.headerRowIndex);
+        }));
       } catch (sheetErr) {
-        console.warn(`解析 sheet「${sheetName}」失败，已跳过：`, sheetErr && sheetErr.message);
+        console.warn(`读取 sheet「${sheetName}」失败，已跳过：`, sheetErr && sheetErr.message);
       }
     }
+
+    const { records: billData, metadata, parsedSheetCount } = parseSheets(rawSheets, 'wechat');
 
     if (parsedSheetCount === 0) {
       return {
@@ -162,9 +151,6 @@ ipcMain.handle('parse-bill-file', async (event, filePath) => {
         message: '未找到账单数据表头：请确认这是“用于个人对账”导出的微信账单（xlsx/csv），而非 PDF 或其它格式。'
       };
     }
-
-    // 多 sheet 合并后去重（重叠时间段可能重复）；单 sheet 文件交易单号唯一，去重为无操作
-    const billData = dedupeRecords(allRecords);
 
     // 找到了表头但没有任何有效交易行（如全部为 '/'、'---' 占位或空行）
     if (billData.length === 0) {
@@ -236,80 +222,6 @@ function readCsvAsUtf8(filePath) {
   return iconv.decode(buf, 'gb18030');
 }
 
-
-function extractMetadata(rawData, headerRowIndex) {
-  const metadata = {
-    nickname: '',
-    startTime: '',
-    endTime: '',
-    exportType: '',
-    exportTime: '',
-    totalCount: 0,
-    incomeCount: 0,
-    incomeAmount: 0,
-    expenseCount: 0,
-    expenseAmount: 0,
-    neutralCount: 0,
-    neutralAmount: 0
-  };
-
-  for (let i = 0; i < headerRowIndex; i++) {
-    const row = rawData[i];
-    if (!row || !row[0]) continue;
-    
-    const text = row[0].toString();
-    
-    if (text.includes('微信昵称')) {
-      const match = text.match(/微信昵称：\[(.+?)\]/);
-      if (match) metadata.nickname = match[1];
-    }
-    
-    if (text.includes('起始时间')) {
-      const startMatch = text.match(/起始时间：\[(.+?)\]/);
-      const endMatch = text.match(/终止时间：\[(.+?)\]/);
-      if (startMatch) metadata.startTime = startMatch[1];
-      if (endMatch) metadata.endTime = endMatch[1];
-    }
-    
-    if (text.includes('导出类型')) {
-      const match = text.match(/导出类型：\[(.+?)\]/);
-      if (match) metadata.exportType = match[1];
-    }
-    
-    if (text.includes('导出时间')) {
-      const match = text.match(/导出时间：\[(.+?)\]/);
-      if (match) metadata.exportTime = match[1];
-    }
-    
-    if (text.match(/^共\d+笔记录/)) {
-      const match = text.match(/共(\d+)笔记录/);
-      if (match) metadata.totalCount = parseInt(match[1]);
-    }
-    
-    if (text.includes('收入：')) {
-      const countMatch = text.match(/收入：(\d+)笔/);
-      const amountMatch = text.match(/(\d+\.?\d*)元/);
-      if (countMatch) metadata.incomeCount = parseInt(countMatch[1]);
-      if (amountMatch) metadata.incomeAmount = parseFloat(amountMatch[1]);
-    }
-    
-    if (text.includes('支出：')) {
-      const countMatch = text.match(/支出：(\d+)笔/);
-      const amountMatch = text.match(/(\d+\.?\d*)元/);
-      if (countMatch) metadata.expenseCount = parseInt(countMatch[1]);
-      if (amountMatch) metadata.expenseAmount = parseFloat(amountMatch[1]);
-    }
-    
-    if (text.includes('中性交易：')) {
-      const countMatch = text.match(/中性交易：(\d+)笔/);
-      const amountMatch = text.match(/(\d+\.?\d*)元/);
-      if (countMatch) metadata.neutralCount = parseInt(countMatch[1]);
-      if (amountMatch) metadata.neutralAmount = parseFloat(amountMatch[1]);
-    }
-  }
-
-  return metadata;
-}
 
 ipcMain.handle('export-report', async (event, reportData) => {
   try {
