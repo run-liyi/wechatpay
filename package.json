@@ -54,8 +54,7 @@
           ]
         }
       ],
-      "icon": "assets/icon.ico",
-      "sign": null
+      "icon": "assets/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -70,7 +69,11 @@
       "target": [
         "dmg"
       ],
-      "icon": "assets/icon.icns"
+      "icon": "assets/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "linux": {
       "target": [
