@@ -163,12 +163,23 @@ function updateOverviewView() {
     document.getElementById('incomeCount').textContent = `${analysis.incomeCount}笔`;
     
     document.getElementById('totalExpense').textContent = `¥${analysis.totalExpense.toFixed(2)}`;
-    document.getElementById('expenseCount').textContent = `${analysis.expenseCount}笔`;
-    
+    // 已退款支出已从有效支出剔除，附注说明
+    document.getElementById('expenseCount').textContent = analysis.refundedCount > 0
+        ? `${analysis.expenseCount}笔（不含已退款${analysis.refundedCount}笔）`
+        : `${analysis.expenseCount}笔`;
+
     const netBalance = analysis.totalIncome - analysis.totalExpense;
     document.getElementById('netBalance').textContent = `¥${netBalance.toFixed(2)}`;
     document.getElementById('balanceStatus').textContent = netBalance >= 0 ? '收入大于支出' : '支出大于收入';
-    
+
+    // 中性交易（不计收支）单独展示
+    const neutralEl = document.getElementById('totalNeutral');
+    if (neutralEl) {
+        neutralEl.textContent = `¥${analysis.neutralAmount.toFixed(2)}`;
+        const nc = document.getElementById('neutralCount');
+        if (nc) nc.textContent = `${analysis.neutralCount}笔`;
+    }
+
     document.getElementById('totalTransactions').textContent = billData.length;
     document.getElementById('dateRange').textContent = `${analysis.dateRange.start} 至 ${analysis.dateRange.end}`;
     

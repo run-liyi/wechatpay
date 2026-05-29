@@ -348,6 +348,10 @@ body {
     background: linear-gradient(135deg, #ffc300 0%, #e6b000 100%);
 }
 
+.stat-icon.neutral {
+    background: linear-gradient(135deg, #8c8c8c 0%, #6e6e6e 100%);
+}
+
 .stat-content {
     flex: 1;
 }
