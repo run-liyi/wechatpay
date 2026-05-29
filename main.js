@@ -117,12 +117,27 @@ ipcMain.handle('parse-bill-file', async (event, filePath) => {
     if (parsedSheetCount === 0) {
       return {
         success: false,
-        message: '未找到账单数据表头，请确认文件格式是否正确'
+        reason: 'no_header',
+        message: '未找到账单数据表头：请确认这是“用于个人对账”导出的微信账单（xlsx/csv），而非 PDF 或其它格式。'
       };
     }
 
     // 多 sheet 合并后去重（重叠时间段可能重复）；单 sheet 文件交易单号唯一，去重为无操作
     const billData = dedupeRecords(allRecords);
+
+    // 找到了表头但没有任何有效交易行（如全部为 '/'、'---' 占位或空行）
+    if (billData.length === 0) {
+      return {
+        success: true,
+        data: [],
+        metadata: metadata || {},
+        totalRecords: 0,
+        diagnostic: {
+          reason: 'no_valid_rows',
+          message: '已识别账单格式，但未找到有效交易记录（该时间段可能无交易）。'
+        }
+      };
+    }
 
     return {
       success: true,
@@ -133,9 +148,14 @@ ipcMain.handle('parse-bill-file', async (event, filePath) => {
 
   } catch (error) {
     console.error('解析文件错误:', error);
+    // 区分编码类异常，给出更可读的诊断
+    const isEncoding = /codepage|encoding|decode|charset/i.test(String(error && error.message));
     return {
       success: false,
-      message: `文件解析失败: ${error.message}`
+      reason: isEncoding ? 'encoding' : 'exception',
+      message: isEncoding
+        ? `文件编码异常，无法正确解码：${error.message}`
+        : `文件解析失败：${error.message}`
     };
   }
 });
