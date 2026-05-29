@@ -9,7 +9,9 @@
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
-    "pack": "electron-packager . 微信账单分析工具 --platform=win32 --arch=x64 --out=release --overwrite --icon=assets/icon.ico"
+    "pack": "electron-packager . 微信账单分析工具 --platform=win32 --arch=x64 --out=release --overwrite --icon=assets/icon.ico",
+    "audit": "npm audit",
+    "audit:ci": "npm audit --omit=dev --audit-level=high"
   },
   "keywords": [
     "wechat",
@@ -52,8 +54,7 @@
           ]
         }
       ],
-      "icon": "assets/icon.ico",
-      "sign": null
+      "icon": "assets/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -68,7 +69,11 @@
       "target": [
         "dmg"
       ],
-      "icon": "assets/icon.icns"
+      "icon": "assets/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "linux": {
       "target": [
