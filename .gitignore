@@ -15,3 +15,19 @@ Thumbs.db
 *.iml
 package-lock.json
 yarn.lock
+
+# ===== 账单与隐私数据（严禁提交真实账单）=====
+# 默认忽略一切表格/账单文件，避免个人账单被误提交
+*.xlsx
+*.xls
+*.csv
+# 仅放行 sample/ 目录下的脱敏演示样例
+!sample/
+!sample/**
+
+# 本地缓存、持久化数据与导出报告
+/data/
+/userData/
+*.bill.json
+微信账单分析报告*.xlsx
+导出报告*.xlsx
