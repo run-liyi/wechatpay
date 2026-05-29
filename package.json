@@ -11,7 +11,8 @@
     "build:linux": "electron-builder --linux",
     "pack": "electron-packager . 微信账单分析工具 --platform=win32 --arch=x64 --out=release --overwrite --icon=assets/icon.ico",
     "audit": "npm audit",
-    "audit:ci": "npm audit --omit=dev --audit-level=high"
+    "audit:ci": "npm audit --omit=dev --audit-level=high",
+    "test": "node --test"
   },
   "keywords": [
     "wechat",

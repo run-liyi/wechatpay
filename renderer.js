@@ -117,7 +117,7 @@ async function selectFile() {
     const fileStatus = document.querySelector('.file-status');
     
     // 优先用主进程下发的 basename；兜底时同时按 / 和 \ 切分，兼容三平台路径
-    fileName.textContent = result.fileName || result.filePath.split(/[\\/]/).pop();
+    fileName.textContent = result.fileName || extractFileName(result.filePath);
     fileStatus.textContent = '正在解析...';
     fileInfo.classList.remove('hidden');
     
@@ -730,8 +730,10 @@ function updateTrendStats(trendData) {
         if (el) el.textContent = value;
     };
 
-    // 空账单/无趋势数据：直接兜底，避免 ÷0 得 NaN、Math.max(...[]) 得 -Infinity、trendData[-1] 越界崩溃
-    if (!Array.isArray(trendData) || trendData.length === 0) {
+    // 纯计算交由 computeExpenseStats（已抽离便于单测）：含空数据/全无支出兜底
+    const stats = computeExpenseStats(trendData);
+
+    if (!stats.hasExpense) {
         setText('avgDailyExpense', '¥0.00');
         setText('maxDailyExpense', '¥0.00');
         setText('maxExpenseDate', '暂无支出');
@@ -740,33 +742,11 @@ function updateTrendStats(trendData) {
         return;
     }
 
-    // 仅统计「确有支出」的区间，避免无支出日把最小值拉成 0、日期失真
-    const expenseEntries = trendData.filter(d => d.expense > 0);
-    if (expenseEntries.length === 0) {
-        // 全为收入或全无支出
-        setText('avgDailyExpense', '¥0.00');
-        setText('maxDailyExpense', '¥0.00');
-        setText('maxExpenseDate', '暂无支出');
-        setText('minDailyExpense', '¥0.00');
-        setText('minExpenseDate', '暂无支出');
-        return;
-    }
-
-    // 日均支出：总支出 ÷ 全部区间数（含无支出区间），口径与原实现一致
-    const avgExpense = trendData.reduce((s, d) => s + d.expense, 0) / trendData.length;
-
-    let maxEntry = expenseEntries[0];
-    let minEntry = expenseEntries[0];
-    for (const d of expenseEntries) {
-        if (d.expense > maxEntry.expense) maxEntry = d;
-        if (d.expense < minEntry.expense) minEntry = d;
-    }
-
-    setText('avgDailyExpense', `¥${avgExpense.toFixed(2)}`);
-    setText('maxDailyExpense', `¥${maxEntry.expense.toFixed(2)}`);
-    setText('maxExpenseDate', maxEntry.date);
-    setText('minDailyExpense', `¥${minEntry.expense.toFixed(2)}`);
-    setText('minExpenseDate', minEntry.date);
+    setText('avgDailyExpense', `¥${stats.avg.toFixed(2)}`);
+    setText('maxDailyExpense', `¥${stats.max.toFixed(2)}`);
+    setText('maxExpenseDate', stats.maxDate);
+    setText('minDailyExpense', `¥${stats.min.toFixed(2)}`);
+    setText('minExpenseDate', stats.minDate);
 }
 
 function updateDetailView() {
