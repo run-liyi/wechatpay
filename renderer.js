@@ -802,7 +802,54 @@ function showHelp() {
 }
 
 function showNotification(type, message) {
-    console.log(`[${type.toUpperCase()}] ${message}`);
+    console.log(`[${String(type).toUpperCase()}] ${message}`);
+
+    const container = document.getElementById('toastContainer');
+    if (!container) return; // 容器缺失时退化为仅日志，保证健壮
+
+    const icons = { success: '✓', error: '✗', info: 'ℹ', warning: '⚠' };
+    const kind = icons[type] ? type : 'info';
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${kind}`;
+    toast.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+
+    const icon = document.createElement('span');
+    icon.className = 'toast-icon';
+    icon.textContent = icons[kind];
+
+    const msg = document.createElement('span');
+    msg.className = 'toast-message';
+    msg.textContent = message; // textContent 避免任何注入
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'toast-close';
+    closeBtn.setAttribute('aria-label', '关闭通知');
+    closeBtn.textContent = '×';
+
+    toast.append(icon, msg, closeBtn);
+    container.appendChild(toast);
+
+    // 入场动画
+    requestAnimationFrame(() => toast.classList.add('toast-show'));
+
+    let timer = null;
+    const dismiss = () => {
+        if (!toast.isConnected) return;
+        clearTimeout(timer);
+        toast.classList.remove('toast-show');
+        toast.classList.add('toast-hide');
+        const remove = () => toast.remove();
+        toast.addEventListener('transitionend', remove, { once: true });
+        setTimeout(remove, 400); // 兜底，确保最终被移除
+    };
+
+    const AUTO_MS = type === 'error' ? 6000 : 3500;
+    timer = setTimeout(dismiss, AUTO_MS);
+    // 悬停暂停、移出后稍候关闭
+    toast.addEventListener('mouseenter', () => clearTimeout(timer));
+    toast.addEventListener('mouseleave', () => { timer = setTimeout(dismiss, 1500); });
+    closeBtn.addEventListener('click', dismiss);
 }
 
 function formatDate(date) {
