@@ -1,20 +1,26 @@
 // preload.js
 // 在隔离的预加载环境中运行（contextIsolation: true + sandbox: true）。
-// 仅通过 contextBridge 暴露受控的 IPC 入口给渲染进程，渲染层不再直接 require('electron')。
-//
-// 说明：本 PR 先建立安全基线（关闭 nodeIntegration、开启 contextIsolation/sandbox），
-// 暴露一个最小的 invoke 桥接以保持现有功能可用；后续 PR 将进一步收敛为按方法命名的
-// 白名单接口（selectFile / parseBill / exportReport）并加入参数校验。
+// 仅通过 contextBridge 暴露「按方法命名」的最小化 IPC 白名单，渲染层不再直接 require('electron')，
+// 也不再暴露任意通道的通用 invoke——杜绝渲染进程调用未授权的 IPC 通道。
 const { contextBridge, ipcRenderer } = require('electron');
 
-// 允许的 IPC 通道白名单（与主进程 ipcMain.handle 注册的通道一致）。
-const ALLOWED_CHANNELS = ['select-file', 'parse-bill-file', 'export-report'];
+contextBridge.exposeInMainWorld('billAPI', {
+  // 打开文件选择对话框
+  selectFile: () => ipcRenderer.invoke('select-file'),
 
-contextBridge.exposeInMainWorld('electronAPI', {
-  invoke: (channel, ...args) => {
-    if (!ALLOWED_CHANNELS.includes(channel)) {
-      return Promise.reject(new Error(`Blocked IPC channel: ${channel}`));
+  // 解析指定路径的账单文件
+  parseBill: (filePath) => {
+    if (typeof filePath !== 'string' || filePath.trim() === '') {
+      return Promise.reject(new TypeError('parseBill: filePath 必须为非空字符串'));
     }
-    return ipcRenderer.invoke(channel, ...args);
+    return ipcRenderer.invoke('parse-bill-file', filePath);
+  },
+
+  // 导出分析报告
+  exportReport: (reportData) => {
+    if (reportData === null || typeof reportData !== 'object') {
+      return Promise.reject(new TypeError('exportReport: reportData 必须为对象'));
+    }
+    return ipcRenderer.invoke('export-report', reportData);
   }
 });
