@@ -240,83 +240,7 @@ function updateOverviewView() {
     renderIncomeExpenseChart(analysis);
 }
 
-/**
- * 统一的交易规整：判定收支方向、是否已退款、金额。
- * - 收/支 = 收入/支出/不计收支(中性交易，如零钱提现、信用卡还款)
- * - 当前状态含「退款/全额退款」视为已退款：净收支口径下从有效支出中剔除
- * @returns {{direction:'income'|'expense'|'neutral', refunded:boolean, amount:number}}
- */
-function classifyRecord(record) {
-    const type = record['收/支'];
-    const status = (record['当前状态'] || '').toString();
-    const amount = parseAmount(record['金额(元)']);
-    const refunded = status.includes('已退款') || status.includes('全额退款') || status.includes('退款成功');
-
-    let direction;
-    if (type === '收入') direction = 'income';
-    else if (type === '支出') direction = 'expense';
-    else direction = 'neutral'; // 不计收支 / 中性交易
-
-    return { direction, refunded, amount };
-}
-
-function analyzeOverview(data) {
-    let totalIncome = 0;
-    let totalExpense = 0;
-    let incomeCount = 0;
-    let expenseCount = 0;
-    let neutralAmount = 0;
-    let neutralCount = 0;
-    let refundedAmount = 0;
-    let refundedCount = 0;
-    let dates = [];
-
-    data.forEach(record => {
-        const { direction, refunded, amount } = classifyRecord(record);
-
-        if (direction === 'income') {
-            totalIncome += amount;
-            incomeCount++;
-        } else if (direction === 'expense') {
-            if (refunded) {
-                // 已退款支出从有效支出中剔除，单独统计，避免净收支被高估
-                refundedAmount += amount;
-                refundedCount++;
-            } else {
-                totalExpense += amount;
-                expenseCount++;
-            }
-        } else {
-            // 中性交易（不计收支）：单独归类，不进入收入/支出
-            neutralAmount += amount;
-            neutralCount++;
-        }
-
-        const dateStr = record['交易时间'];
-        if (dateStr) {
-            const d = parseDate(dateStr);
-            if (d) dates.push(d); // 无法解析的日期安全跳过，不计入范围
-        }
-    });
-
-    dates.sort((a, b) => a - b);
-    const dateRange = {
-        start: dates.length > 0 ? formatDate(dates[0]) : '-',
-        end: dates.length > 0 ? formatDate(dates[dates.length - 1]) : '-'
-    };
-
-    return {
-        totalIncome,
-        totalExpense,
-        incomeCount,
-        expenseCount,
-        neutralAmount,
-        neutralCount,
-        refundedAmount,
-        refundedCount,
-        dateRange
-    };
-}
+// classifyRecord / analyzeOverview 已抽至 src/core/analytics.js（全局可用）
 
 function renderIncomeExpenseChart(analysis) {
     const ctx = document.getElementById('incomeExpenseChart');
@@ -383,38 +307,7 @@ function updateAnalysisView() {
     renderStatusStats(statusStats);
 }
 
-function analyzeByDimension(data, dimension) {
-    const stats = {};
-    
-    data.forEach(record => {
-        const key = record[dimension] || '未知';
-        const { direction, refunded, amount } = classifyRecord(record);
-
-        if (!stats[key]) {
-            stats[key] = {
-                count: 0,
-                totalAmount: 0,
-                incomeAmount: 0,
-                expenseAmount: 0
-            };
-        }
-
-        stats[key].count++;
-        stats[key].totalAmount += amount;
-
-        if (direction === 'income') {
-            stats[key].incomeAmount += amount;
-        } else if (direction === 'expense' && !refunded) {
-            // 已退款支出不计入支出金额，保持与概览口径一致
-            stats[key].expenseAmount += amount;
-        }
-    });
-    
-    return Object.entries(stats).map(([key, value]) => ({
-        name: key,
-        ...value
-    })).sort((a, b) => b.totalAmount - a.totalAmount);
-}
+// analyzeByDimension 已抽至 src/core/analytics.js（全局可用）
 
 function renderPaymentMethodChart(stats) {
     const ctx = document.getElementById('paymentMethodChart');
@@ -653,56 +546,7 @@ function updateTrendView() {
     updateTrendStats(trendData);
 }
 
-function analyzeTrend(data, granularity) {
-    const trends = {};
-    
-    data.forEach(record => {
-        const dateStr = record['交易时间'];
-        if (!dateStr) return;
-
-        const date = parseDate(dateStr);
-        if (!date) return; // 无法解析的日期不计入趋势聚合
-        let key;
-        
-        switch(granularity) {
-            case 'daily':
-                key = formatDate(date);
-                break;
-            case 'weekly':
-                const weekStart = new Date(date);
-                weekStart.setDate(date.getDate() - date.getDay());
-                key = formatDate(weekStart);
-                break;
-            case 'monthly':
-                key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                break;
-        }
-        
-        if (!trends[key]) {
-            trends[key] = {
-                income: 0,
-                expense: 0,
-                incomeCount: 0,
-                expenseCount: 0
-            };
-        }
-        
-        const { direction, refunded, amount } = classifyRecord(record);
-
-        if (direction === 'income') {
-            trends[key].income += amount;
-            trends[key].incomeCount++;
-        } else if (direction === 'expense' && !refunded) {
-            // 已退款支出不计入趋势支出，保持口径一致
-            trends[key].expense += amount;
-            trends[key].expenseCount++;
-        }
-    });
-    
-    return Object.entries(trends)
-        .map(([date, data]) => ({ date, ...data }))
-        .sort((a, b) => a.date.localeCompare(b.date));
-}
+// analyzeTrend 已抽至 src/core/analytics.js（全局可用）
 
 function renderTrendChart(trendData, dataType) {
     const ctx = document.getElementById('trendChart');
@@ -982,12 +826,7 @@ function showNotification(type, message) {
     closeBtn.addEventListener('click', dismiss);
 }
 
-function formatDate(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
+// formatDate 已抽至 src/core/analytics.js（全局可用）
 
 // 构建统一的空状态占位节点（图标 + 主标题 + 可选引导）
 function createEmptyState(title, hint) {
