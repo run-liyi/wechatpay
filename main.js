@@ -5,8 +5,10 @@ const XLSX = require('xlsx');
 const iconv = require('iconv-lite');
 const { SecureStore } = require('./src/secure-store');
 const { parseSheets } = require('./src/import/parser');
+const { TransactionStore } = require('./src/store/db');
 
 let secureStore = null;
+let txStore = null;
 
 let mainWindow;
 
@@ -78,6 +80,8 @@ const CSP = [
 app.whenReady().then(() => {
   // 静态加密存储置于 userData 目录，落盘内容全程密文
   secureStore = new SecureStore(path.join(app.getPath('userData'), 'bill-secure.enc'));
+  // 本地交易持久化（再次打开免重导）
+  txStore = new TransactionStore(path.join(app.getPath('userData'), 'transactions.json'));
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
@@ -318,4 +322,34 @@ ipcMain.handle('secure-load', () => {
 ipcMain.handle('secure-wipe', () => {
   secureStore.wipe();
   return { success: true };
+});
+
+// ===== 本地交易持久化 IPC =====
+ipcMain.handle('load-transactions', () => {
+  try {
+    const { transactions, metadata } = txStore.load();
+    return { success: true, transactions, metadata };
+  } catch (e) {
+    return { success: false, message: e.message, transactions: [], metadata: {} };
+  }
+});
+
+ipcMain.handle('save-transactions', (event, payload) => {
+  try {
+    const records = (payload && payload.transactions) || [];
+    const metadata = (payload && payload.metadata) || {};
+    const result = txStore.save(records, metadata);
+    return { success: true, ...result };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+});
+
+ipcMain.handle('clear-transactions', () => {
+  try {
+    txStore.clear();
+    return { success: true };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
 });
