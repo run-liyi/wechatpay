@@ -1,15 +1,19 @@
 // detail-table.js — 明细查询：虚拟滚动 + 列排序 + 关键词/类型/状态筛选。
+import { setEmptyState } from '../dom/ui.js';
+import { state } from '../state.js';
+import { parseAmount } from '../utils/amount.js';
+import { parseDate } from '../utils/date.js';
 
-function updateDetailView() {
+export function updateDetailView() {
     filterDetailData();
 }
 
-function filterDetailData() {
+export function filterDetailData() {
     const keyword = document.getElementById('searchKeyword').value.toLowerCase();
     const filterType = document.getElementById('filterType').value;
     const filterStatus = document.getElementById('filterStatus').value;
     
-    let filtered = billData.filter(record => {
+    let filtered = state.billData.filter(record => {
         const matchKeyword = !keyword || 
             (record['交易对方'] && record['交易对方'].toLowerCase().includes(keyword)) ||
             (record['商品'] && record['商品'].toLowerCase().includes(keyword));
@@ -33,7 +37,7 @@ function filterDetailData() {
     renderDetailTable(filtered);
 }
 
-function resetDetailFilter() {
+export function resetDetailFilter() {
     document.getElementById('searchKeyword').value = '';
     document.getElementById('filterType').value = 'all';
     document.getElementById('filterStatus').value = 'all';
@@ -55,7 +59,7 @@ const DETAIL_ROW_H = 40;
 let detailData = [];
 let detailSort = { key: null, dir: 1 }; // dir: 1 升序, -1 降序
 
-function applyDetailSort() {
+export function applyDetailSort() {
     const { key, dir } = detailSort;
     if (!key) return;
     const col = DETAIL_COLUMNS.find(c => c.key === key);
@@ -72,7 +76,7 @@ function applyDetailSort() {
 }
 
 // 明细表：虚拟滚动（仅渲染可视区行）+ 点击表头多列排序
-function renderDetailTable(data) {
+export function renderDetailTable(data) {
     const container = document.getElementById('detailTable');
     detailData = data.slice();
     applyDetailSort();

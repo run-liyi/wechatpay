@@ -1,10 +1,12 @@
 // app.js — 应用入口：全局状态、初始化、事件绑定、文件选择/导出、持久化与偏好。
-
-let billData = [];
-let metadata = {};
-let currentView = 'welcome';
-let charts = {};
-let fileLoaded = false;
+import Chart from 'chart.js/auto';
+import * as ChartTheme from '../chart-theme.js';
+import { showNotification } from './dom/ui.js';
+import { switchView, updateCategoryView, updateTrendView } from './views/views.js';
+import { filterDetailData, resetDetailFilter } from './views/detail-table.js';
+import { state } from './state.js';
+import { extractFileName } from './utils/filename.js';
+import { analyzeByDimension, analyzeOverview, analyzeTrend } from './core/analytics.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     initializeApp();
@@ -14,10 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
 const PREF_SELECTS = ['categoryDimension', 'categorySortBy', 'categoryTopN', 'trendGranularity', 'trendDataType'];
 let viewPrefs = {};
 
-async function initializeApp() {
-    if (window.ChartTheme && window.Chart) {
-        ChartTheme.applyChartDefaults(window.Chart);
-    }
+export async function initializeApp() {
+    ChartTheme.applyChartDefaults(Chart);
     setupEventListeners();
     setupNavigation();
     setupModal();
@@ -27,7 +27,7 @@ async function initializeApp() {
 }
 
 // 启动时从配置层恢复视图偏好（重启后仍保留）
-async function restorePreferences() {
+export async function restorePreferences() {
     if (!window.billAPI || !window.billAPI.config) return;
     try {
         const res = await window.billAPI.config.getAll();
@@ -42,7 +42,7 @@ async function restorePreferences() {
 }
 
 // 监听偏好下拉项变化并持久化
-function setupPreferencePersistence() {
+export function setupPreferencePersistence() {
     PREF_SELECTS.forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
@@ -56,23 +56,23 @@ function setupPreferencePersistence() {
 }
 
 // 启动后自动加载上次保存的交易数据，无需重新选文件
-async function loadPersistedData() {
+export async function loadPersistedData() {
     if (!window.billAPI || !window.billAPI.loadTransactions) return;
     try {
         const res = await window.billAPI.loadTransactions();
         if (!res || !res.success || !Array.isArray(res.transactions) || res.transactions.length === 0) {
             return;
         }
-        billData = res.transactions;
-        metadata = res.metadata || {};
-        fileLoaded = true;
+        state.billData = res.transactions;
+        state.metadata = res.metadata || {};
+        state.fileLoaded = true;
 
         const fileInfo = document.getElementById('fileInfo');
         const fileName = document.querySelector('.file-name');
         const fileStatus = document.querySelector('.file-status');
         if (fileName) fileName.textContent = '上次保存的数据';
         if (fileStatus) {
-            fileStatus.textContent = `已自动加载 ${billData.length} 条记录`;
+            fileStatus.textContent = `已自动加载 ${state.billData.length} 条记录`;
             fileStatus.style.color = 'var(--success-color)';
         }
         if (fileInfo) fileInfo.classList.remove('hidden');
@@ -82,17 +82,17 @@ async function loadPersistedData() {
         switchView('overview');
         document.querySelector('.nav-item[data-view="overview"]').classList.add('active');
         document.querySelector('.nav-item[data-view="welcome"]')?.classList.remove('active');
-        showNotification('info', `已自动加载上次保存的 ${billData.length} 条记录`);
+        showNotification('info', `已自动加载上次保存的 ${state.billData.length} 条记录`);
     } catch (e) {
         console.warn('加载本地数据失败:', e && e.message);
     }
 }
 
 // 将当前数据持久化到本地（按交易单号去重 upsert）
-async function persistData() {
+export async function persistData() {
     if (!window.billAPI || !window.billAPI.saveTransactions) return;
     try {
-        const res = await window.billAPI.saveTransactions(billData, metadata);
+        const res = await window.billAPI.saveTransactions(state.billData, state.metadata);
         if (res && res.success && res.added != null) {
             showNotification('info', `已保存到本地（新增 ${res.added} 条，共 ${res.total} 条）`);
         }
@@ -101,7 +101,7 @@ async function persistData() {
     }
 }
 
-function setupEventListeners() {
+export function setupEventListeners() {
     document.getElementById('selectFileBtn').addEventListener('click', selectFile);
     document.getElementById('exportReportBtn').addEventListener('click', exportReport);
     document.getElementById('helpBtn').addEventListener('click', showHelp);
@@ -121,7 +121,7 @@ function setupEventListeners() {
     });
 }
 
-function setupNavigation() {
+export function setupNavigation() {
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
         item.addEventListener('click', () => {
@@ -134,7 +134,7 @@ function setupNavigation() {
     });
 }
 
-function setupModal() {
+export function setupModal() {
     const modal = document.getElementById('helpModal');
     const closeBtn = document.querySelector('.modal-close');
     
@@ -149,7 +149,7 @@ function setupModal() {
     });
 }
 
-async function selectFile() {
+export async function selectFile() {
     const result = await window.billAPI.selectFile();
     
     if (!result.success) {
@@ -175,11 +175,11 @@ async function selectFile() {
         return;
     }
 
-    billData = parseResult.data || [];
-    metadata = parseResult.metadata || {};
-    fileLoaded = true;
+    state.billData = parseResult.data || [];
+    state.metadata = parseResult.metadata || {};
+    state.fileLoaded = true;
 
-    if (billData.length === 0) {
+    if (state.billData.length === 0) {
         // 已识别格式但无有效记录：友好诊断 + 各视图空状态，不报错
         const diagMsg = (parseResult.diagnostic && parseResult.diagnostic.message)
             || '未找到有效交易记录';
@@ -201,15 +201,15 @@ async function selectFile() {
     document.querySelector('.nav-item[data-view="welcome"]')?.classList.remove('active');
 }
 
-async function exportReport() {
-    if (billData.length === 0) {
+export async function exportReport() {
+    if (state.billData.length === 0) {
         showNotification('error', '没有可导出的数据');
         return;
     }
     
-    const overview = analyzeOverview(billData);
-    const categoryStats = analyzeByDimension(billData, '交易对方');
-    const dailyTrend = analyzeTrend(billData, 'daily');
+    const overview = analyzeOverview(state.billData);
+    const categoryStats = analyzeByDimension(state.billData, '交易对方');
+    const dailyTrend = analyzeTrend(state.billData, 'daily');
     
     const reportData = {
         summary: {
@@ -218,7 +218,7 @@ async function exportReport() {
             '总支出': overview.totalExpense,
             '支出笔数': overview.expenseCount,
             '净收支': overview.totalIncome - overview.totalExpense,
-            '总交易笔数': billData.length,
+            '总交易笔数': state.billData.length,
             '账单开始日期': overview.dateRange.start,
             '账单结束日期': overview.dateRange.end
         },
@@ -238,7 +238,7 @@ async function exportReport() {
             '支出笔数': trend.expenseCount,
             '净收支': trend.income - trend.expense
         })),
-        detailData: billData.map(record => ({
+        detailData: state.billData.map(record => ({
             '交易时间': record['交易时间'],
             '交易类型': record['交易类型'],
             '交易对方': record['交易对方'],
@@ -259,7 +259,7 @@ async function exportReport() {
     }
 }
 
-function showHelp() {
+export function showHelp() {
     const modal = document.getElementById('helpModal');
     modal.classList.add('active');
 }

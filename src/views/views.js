@@ -1,24 +1,30 @@
 // views.js — 视图层：视图切换与各视图渲染（概览/分析/分类/趋势）。
+import { renderTable, setChartEmpty, setEmptyState } from '../dom/ui.js';
+import { renderCategoryChart, renderIncomeExpenseChart, renderPaymentMethodChart, renderTransactionTypeChart, renderTrendChart } from '../charts/charts.js';
+import { updateDetailView } from './detail-table.js';
+import { state } from '../state.js';
+import { computeExpenseStats } from '../analytics/trend.js';
+import { analyzeByDimension, analyzeOverview, analyzeTrend, classifyRecord } from '../core/analytics.js';
 
-function switchView(viewName) {
+export function switchView(viewName) {
     const views = document.querySelectorAll('.view-container');
     views.forEach(view => view.classList.remove('active'));
     
     const targetView = document.getElementById(`${viewName}View`);
     if (targetView) {
         targetView.classList.add('active');
-        currentView = viewName;
+        state.currentView = viewName;
 
         // 已加载过文件后即更新视图（含 0 条记录时显示空状态）
-        if (fileLoaded) {
+        if (state.fileLoaded) {
             updateViewData(viewName);
         }
     }
 }
 
-function updateViewData(viewName) {
+export function updateViewData(viewName) {
     // 解析出 0 条记录时，各视图显示统一空状态占位而非空图表/空白
-    if (!billData || billData.length === 0) {
+    if (!state.billData || state.billData.length === 0) {
         renderEmptyStateForView(viewName);
         return;
     }
@@ -41,8 +47,8 @@ function updateViewData(viewName) {
     }
 }
 
-function updateOverviewView() {
-    const analysis = analyzeOverview(billData);
+export function updateOverviewView() {
+    const analysis = analyzeOverview(state.billData);
     
     document.getElementById('totalIncome').textContent = `¥${analysis.totalIncome.toFixed(2)}`;
     document.getElementById('incomeCount').textContent = `${analysis.incomeCount}笔`;
@@ -65,24 +71,24 @@ function updateOverviewView() {
         if (nc) nc.textContent = `${analysis.neutralCount}笔`;
     }
 
-    document.getElementById('totalTransactions').textContent = billData.length;
+    document.getElementById('totalTransactions').textContent = state.billData.length;
     document.getElementById('dateRange').textContent = `${analysis.dateRange.start} 至 ${analysis.dateRange.end}`;
     
-    document.getElementById('metaNickname').textContent = metadata.nickname || '-';
+    document.getElementById('metaNickname').textContent = state.metadata.nickname || '-';
     document.getElementById('metaDateRange').textContent = 
-        metadata.startTime && metadata.endTime ? `${metadata.startTime} 至 ${metadata.endTime}` : '-';
-    document.getElementById('metaExportTime').textContent = metadata.exportTime || '-';
-    document.getElementById('metaExportType').textContent = metadata.exportType || '-';
+        state.metadata.startTime && state.metadata.endTime ? `${state.metadata.startTime} 至 ${state.metadata.endTime}` : '-';
+    document.getElementById('metaExportTime').textContent = state.metadata.exportTime || '-';
+    document.getElementById('metaExportType').textContent = state.metadata.exportType || '-';
     
     renderIncomeExpenseChart(analysis);
 }
 
 // classifyRecord / analyzeOverview 已抽至 src/core/analytics.js（全局可用）
 
-function updateAnalysisView() {
-    const paymentMethodStats = analyzeByDimension(billData, '支付方式');
-    const transactionTypeStats = analyzeByDimension(billData, '交易类型');
-    const statusStats = analyzeByDimension(billData, '当前状态');
+export function updateAnalysisView() {
+    const paymentMethodStats = analyzeByDimension(state.billData, '支付方式');
+    const transactionTypeStats = analyzeByDimension(state.billData, '交易类型');
+    const statusStats = analyzeByDimension(state.billData, '当前状态');
     
     renderPaymentMethodChart(paymentMethodStats);
     renderTransactionTypeChart(transactionTypeStats);
@@ -91,7 +97,7 @@ function updateAnalysisView() {
 
 // analyzeByDimension 已抽至 src/core/analytics.js（全局可用）
 
-function renderStatusStats(stats) {
+export function renderStatusStats(stats) {
     const container = document.getElementById('statusStats');
 
     const rows = stats.map(stat => [
@@ -105,7 +111,7 @@ function renderStatusStats(stats) {
     renderTable(container, ['状态', '交易笔数', '总金额', '收入', '支出'], rows);
 }
 
-function updateCategoryView() {
+export function updateCategoryView() {
     const dimension = document.getElementById('categoryDimension').value;
     const sortBy = document.getElementById('categorySortBy').value;
     const topN = document.getElementById('categoryTopN').value;
@@ -123,7 +129,7 @@ function updateCategoryView() {
             break;
     }
     
-    let stats = analyzeByDimension(billData, dimensionKey);
+    let stats = analyzeByDimension(state.billData, dimensionKey);
     
     if (sortBy === 'amount') {
         stats.sort((a, b) => b.totalAmount - a.totalAmount);
@@ -139,7 +145,7 @@ function updateCategoryView() {
     renderCategoryTable(stats);
 }
 
-function renderCategoryTable(stats) {
+export function renderCategoryTable(stats) {
     const container = document.getElementById('categoryTable');
 
     const rows = stats.map((stat, index) => [
@@ -154,18 +160,18 @@ function renderCategoryTable(stats) {
     renderTable(container, ['排名', '名称', '交易次数', '总金额', '收入', '支出'], rows);
 }
 
-function updateTrendView() {
+export function updateTrendView() {
     const granularity = document.getElementById('trendGranularity').value;
     const dataType = document.getElementById('trendDataType').value;
     
-    const trendData = analyzeTrend(billData, granularity);
+    const trendData = analyzeTrend(state.billData, granularity);
     renderTrendChart(trendData, dataType);
     updateTrendStats(trendData);
 }
 
 // analyzeTrend 已抽至 src/core/analytics.js（全局可用）
 
-function updateTrendStats(trendData) {
+export function updateTrendStats(trendData) {
     const setText = (id, value) => {
         const el = document.getElementById(id);
         if (el) el.textContent = value;
@@ -190,7 +196,7 @@ function updateTrendStats(trendData) {
     setText('minExpenseDate', stats.minDate);
 }
 
-function renderEmptyStateForView(viewName) {
+export function renderEmptyStateForView(viewName) {
     const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     switch (viewName) {
         case 'overview':
@@ -198,7 +204,7 @@ function renderEmptyStateForView(viewName) {
             setText('totalExpense', '¥0.00'); setText('expenseCount', '0笔');
             setText('netBalance', '¥0.00'); setText('balanceStatus', '-');
             setText('totalTransactions', '0'); setText('dateRange', '-');
-            setText('metaNickname', metadata.nickname || '-');
+            setText('metaNickname', state.metadata.nickname || '-');
             setChartEmpty('incomeExpenseChart', '暂无数据');
             break;
         case 'analysis':
