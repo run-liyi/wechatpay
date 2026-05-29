@@ -110,7 +110,8 @@ async function selectFile() {
     const fileName = document.querySelector('.file-name');
     const fileStatus = document.querySelector('.file-status');
     
-    fileName.textContent = result.filePath.split('\\').pop();
+    // 优先用主进程下发的 basename；兜底时同时按 / 和 \ 切分，兼容三平台路径
+    fileName.textContent = result.fileName || result.filePath.split(/[\\/]/).pop();
     fileStatus.textContent = '正在解析...';
     fileInfo.classList.remove('hidden');
     
