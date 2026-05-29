@@ -234,6 +234,28 @@ function analyzeTrend(data, granularity) {
 - 不收集、不传输任何个人信息
 - 建议妥善保管账单文件，避免泄露个人财务信息
 
+### 提交防护（面向贡献者）
+
+为避免把真实账单或个人信息误提交到版本库，本项目内置两道防线：
+
+1. **`.gitignore` 默认忽略账单文件**：根目录及子目录下的 `*.xlsx / *.xls / *.csv` 一律被忽略，
+   仅放行 `sample/` 下的脱敏样例；本地数据目录（`data/`、`userData/`）与导出报告也已忽略。
+2. **提交前敏感信息扫描钩子** `scripts/precommit-secret-scan.sh`：拦截 `sample/` 之外的账单文件，
+   以及包含微信账单表头、手机号、身份证号等特征的暂存内容。
+
+启用钩子（任选其一）：
+
+```bash
+# 方式一：软链为本地 pre-commit 钩子
+ln -sf ../../scripts/precommit-secret-scan.sh .git/hooks/pre-commit
+
+# 方式二：使用项目内钩子目录
+git config core.hooksPath scripts/githooks
+cp scripts/precommit-secret-scan.sh scripts/githooks/pre-commit
+```
+
+确需提交被误判的内容时，可临时 `SKIP_BILL_SCAN=1 git commit ...` 跳过（请谨慎）。
+
 ## ⚙️ 系统要求
 
 - **操作系统**：Windows 10/11, macOS 10.13+, Linux
