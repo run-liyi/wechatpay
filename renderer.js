@@ -653,19 +653,48 @@ function renderTrendChart(trendData, dataType) {
 }
 
 function updateTrendStats(trendData) {
-    const expenses = trendData.map(d => d.expense);
-    const avgExpense = expenses.reduce((a, b) => a + b, 0) / expenses.length;
-    const maxExpense = Math.max(...expenses);
-    const minExpense = Math.min(...expenses);
-    
-    const maxIndex = expenses.indexOf(maxExpense);
-    const minIndex = expenses.indexOf(minExpense);
-    
-    document.getElementById('avgDailyExpense').textContent = `¥${avgExpense.toFixed(2)}`;
-    document.getElementById('maxDailyExpense').textContent = `¥${maxExpense.toFixed(2)}`;
-    document.getElementById('maxExpenseDate').textContent = trendData[maxIndex].date;
-    document.getElementById('minDailyExpense').textContent = `¥${minExpense.toFixed(2)}`;
-    document.getElementById('minExpenseDate').textContent = trendData[minIndex].date;
+    const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+    };
+
+    // 空账单/无趋势数据：直接兜底，避免 ÷0 得 NaN、Math.max(...[]) 得 -Infinity、trendData[-1] 越界崩溃
+    if (!Array.isArray(trendData) || trendData.length === 0) {
+        setText('avgDailyExpense', '¥0.00');
+        setText('maxDailyExpense', '¥0.00');
+        setText('maxExpenseDate', '暂无支出');
+        setText('minDailyExpense', '¥0.00');
+        setText('minExpenseDate', '暂无支出');
+        return;
+    }
+
+    // 仅统计「确有支出」的区间，避免无支出日把最小值拉成 0、日期失真
+    const expenseEntries = trendData.filter(d => d.expense > 0);
+    if (expenseEntries.length === 0) {
+        // 全为收入或全无支出
+        setText('avgDailyExpense', '¥0.00');
+        setText('maxDailyExpense', '¥0.00');
+        setText('maxExpenseDate', '暂无支出');
+        setText('minDailyExpense', '¥0.00');
+        setText('minExpenseDate', '暂无支出');
+        return;
+    }
+
+    // 日均支出：总支出 ÷ 全部区间数（含无支出区间），口径与原实现一致
+    const avgExpense = trendData.reduce((s, d) => s + d.expense, 0) / trendData.length;
+
+    let maxEntry = expenseEntries[0];
+    let minEntry = expenseEntries[0];
+    for (const d of expenseEntries) {
+        if (d.expense > maxEntry.expense) maxEntry = d;
+        if (d.expense < minEntry.expense) minEntry = d;
+    }
+
+    setText('avgDailyExpense', `¥${avgExpense.toFixed(2)}`);
+    setText('maxDailyExpense', `¥${maxEntry.expense.toFixed(2)}`);
+    setText('maxExpenseDate', maxEntry.date);
+    setText('minDailyExpense', `¥${minEntry.expense.toFixed(2)}`);
+    setText('minExpenseDate', minEntry.date);
 }
 
 function updateDetailView() {
