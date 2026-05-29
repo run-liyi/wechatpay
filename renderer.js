@@ -163,12 +163,23 @@ function updateOverviewView() {
     document.getElementById('incomeCount').textContent = `${analysis.incomeCount}笔`;
     
     document.getElementById('totalExpense').textContent = `¥${analysis.totalExpense.toFixed(2)}`;
-    document.getElementById('expenseCount').textContent = `${analysis.expenseCount}笔`;
-    
+    // 已退款支出已从有效支出剔除，附注说明
+    document.getElementById('expenseCount').textContent = analysis.refundedCount > 0
+        ? `${analysis.expenseCount}笔（不含已退款${analysis.refundedCount}笔）`
+        : `${analysis.expenseCount}笔`;
+
     const netBalance = analysis.totalIncome - analysis.totalExpense;
     document.getElementById('netBalance').textContent = `¥${netBalance.toFixed(2)}`;
     document.getElementById('balanceStatus').textContent = netBalance >= 0 ? '收入大于支出' : '支出大于收入';
-    
+
+    // 中性交易（不计收支）单独展示
+    const neutralEl = document.getElementById('totalNeutral');
+    if (neutralEl) {
+        neutralEl.textContent = `¥${analysis.neutralAmount.toFixed(2)}`;
+        const nc = document.getElementById('neutralCount');
+        if (nc) nc.textContent = `${analysis.neutralCount}笔`;
+    }
+
     document.getElementById('totalTransactions').textContent = billData.length;
     document.getElementById('dateRange').textContent = `${analysis.dateRange.start} 至 ${analysis.dateRange.end}`;
     
@@ -181,26 +192,59 @@ function updateOverviewView() {
     renderIncomeExpenseChart(analysis);
 }
 
+/**
+ * 统一的交易规整：判定收支方向、是否已退款、金额。
+ * - 收/支 = 收入/支出/不计收支(中性交易，如零钱提现、信用卡还款)
+ * - 当前状态含「退款/全额退款」视为已退款：净收支口径下从有效支出中剔除
+ * @returns {{direction:'income'|'expense'|'neutral', refunded:boolean, amount:number}}
+ */
+function classifyRecord(record) {
+    const type = record['收/支'];
+    const status = (record['当前状态'] || '').toString();
+    const amount = parseAmount(record['金额(元)']);
+    const refunded = status.includes('已退款') || status.includes('全额退款') || status.includes('退款成功');
+
+    let direction;
+    if (type === '收入') direction = 'income';
+    else if (type === '支出') direction = 'expense';
+    else direction = 'neutral'; // 不计收支 / 中性交易
+
+    return { direction, refunded, amount };
+}
+
 function analyzeOverview(data) {
     let totalIncome = 0;
     let totalExpense = 0;
     let incomeCount = 0;
     let expenseCount = 0;
+    let neutralAmount = 0;
+    let neutralCount = 0;
+    let refundedAmount = 0;
+    let refundedCount = 0;
     let dates = [];
-    
+
     data.forEach(record => {
-        const amount = parseAmount(record['金额(元)']);
-        const type = record['收/支'];
-        const dateStr = record['交易时间'];
-        
-        if (type === '收入') {
+        const { direction, refunded, amount } = classifyRecord(record);
+
+        if (direction === 'income') {
             totalIncome += amount;
             incomeCount++;
-        } else if (type === '支出') {
-            totalExpense += amount;
-            expenseCount++;
+        } else if (direction === 'expense') {
+            if (refunded) {
+                // 已退款支出从有效支出中剔除，单独统计，避免净收支被高估
+                refundedAmount += amount;
+                refundedCount++;
+            } else {
+                totalExpense += amount;
+                expenseCount++;
+            }
+        } else {
+            // 中性交易（不计收支）：单独归类，不进入收入/支出
+            neutralAmount += amount;
+            neutralCount++;
         }
-        
+
+        const dateStr = record['交易时间'];
         if (dateStr) {
             const d = parseDate(dateStr);
             if (d) dates.push(d); // 无法解析的日期安全跳过，不计入范围
@@ -212,12 +256,16 @@ function analyzeOverview(data) {
         start: dates.length > 0 ? formatDate(dates[0]) : '-',
         end: dates.length > 0 ? formatDate(dates[dates.length - 1]) : '-'
     };
-    
+
     return {
         totalIncome,
         totalExpense,
         incomeCount,
         expenseCount,
+        neutralAmount,
+        neutralCount,
+        refundedAmount,
+        refundedCount,
         dateRange
     };
 }
@@ -292,9 +340,8 @@ function analyzeByDimension(data, dimension) {
     
     data.forEach(record => {
         const key = record[dimension] || '未知';
-        const amount = parseAmount(record['金额(元)']);
-        const type = record['收/支'];
-        
+        const { direction, refunded, amount } = classifyRecord(record);
+
         if (!stats[key]) {
             stats[key] = {
                 count: 0,
@@ -303,13 +350,14 @@ function analyzeByDimension(data, dimension) {
                 expenseAmount: 0
             };
         }
-        
+
         stats[key].count++;
         stats[key].totalAmount += amount;
-        
-        if (type === '收入') {
+
+        if (direction === 'income') {
             stats[key].incomeAmount += amount;
-        } else if (type === '支出') {
+        } else if (direction === 'expense' && !refunded) {
+            // 已退款支出不计入支出金额，保持与概览口径一致
             stats[key].expenseAmount += amount;
         }
     });
@@ -591,13 +639,13 @@ function analyzeTrend(data, granularity) {
             };
         }
         
-        const amount = parseAmount(record['金额(元)']);
-        const type = record['收/支'];
-        
-        if (type === '收入') {
+        const { direction, refunded, amount } = classifyRecord(record);
+
+        if (direction === 'income') {
             trends[key].income += amount;
             trends[key].incomeCount++;
-        } else if (type === '支出') {
+        } else if (direction === 'expense' && !refunded) {
+            // 已退款支出不计入趋势支出，保持口径一致
             trends[key].expense += amount;
             trends[key].expenseCount++;
         }
