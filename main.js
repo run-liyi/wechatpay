@@ -35,6 +35,19 @@ function createWindow() {
     }
   });
 
+  // 拒绝在应用内打开新窗口；仅 http(s) 白名单链接交由系统默认浏览器打开
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+
+  // 禁止附加 <webview>，杜绝嵌入式外部内容
+  mainWindow.webContents.on('will-attach-webview', (event) => {
+    event.preventDefault();
+  });
+
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
   });
