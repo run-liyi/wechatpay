@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const XLSX = require('xlsx');
+const iconv = require('iconv-lite');
 
 let mainWindow;
 
@@ -73,11 +74,24 @@ ipcMain.handle('select-file', async () => {
 
 ipcMain.handle('parse-bill-file', async (event, filePath) => {
   try {
-    const workbook = XLSX.readFile(filePath, { 
-      cellDates: true,
-      dateNF: 'yyyy-mm-dd hh:mm:ss'
-    });
-    
+    // CSV 常为 GBK 编码，默认 UTF-8 解码会乱码导致表头识别失败；按扩展名分流解析
+    const ext = path.extname(filePath).toLowerCase();
+    let workbook;
+    if (ext === '.csv') {
+      const text = readCsvAsUtf8(filePath);
+      workbook = XLSX.read(text, {
+        type: 'string',
+        cellDates: true,
+        dateNF: 'yyyy-mm-dd hh:mm:ss',
+        raw: false
+      });
+    } else {
+      workbook = XLSX.readFile(filePath, {
+        cellDates: true,
+        dateNF: 'yyyy-mm-dd hh:mm:ss'
+      });
+    }
+
     // 遍历工作簿的所有 sheet：账单可能被拆分到多个表（如分月导出），仅取第一个会漏数据
     let allRecords = [];
     let metadata = null;
@@ -127,6 +141,22 @@ ipcMain.handle('parse-bill-file', async (event, filePath) => {
 });
 
 // 在单个 sheet 的二维数组中定位表头并抽取交易记录；该 sheet 无账单表头时返回 null
+// 读取 CSV 并统一转为 UTF-8 文本：处理 UTF-8 BOM 与 GBK/GB18030 中文编码
+function readCsvAsUtf8(filePath) {
+  const buf = fs.readFileSync(filePath);
+  // UTF-8 BOM
+  if (buf.length >= 3 && buf[0] === 0xEF && buf[1] === 0xBB && buf[2] === 0xBF) {
+    return buf.slice(3).toString('utf8');
+  }
+  // 若本身就是合法 UTF-8（重新编码可与原字节完全一致），直接使用
+  const asUtf8 = buf.toString('utf8');
+  if (Buffer.compare(Buffer.from(asUtf8, 'utf8'), buf) === 0) {
+    return asUtf8;
+  }
+  // 否则按 GB18030（GBK 超集）解码
+  return iconv.decode(buf, 'gb18030');
+}
+
 // 表头单元格归一化：去除所有空白(含全角空格)、全角括号转半角，便于容忍变体与列偏移
 function normalizeHeaderCell(cell) {
   if (cell == null) return '';
