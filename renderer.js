@@ -15,6 +15,9 @@ const PREF_SELECTS = ['categoryDimension', 'categorySortBy', 'categoryTopN', 'tr
 let viewPrefs = {};
 
 async function initializeApp() {
+    if (window.ChartTheme && window.Chart) {
+        ChartTheme.applyChartDefaults(window.Chart);
+    }
     setupEventListeners();
     setupNavigation();
     setupModal();
@@ -292,14 +295,8 @@ function renderIncomeExpenseChart(analysis) {
             datasets: [{
                 label: '金额(元)',
                 data: [analysis.totalIncome, analysis.totalExpense],
-                backgroundColor: [
-                    'rgba(7, 193, 96, 0.8)',
-                    'rgba(250, 81, 81, 0.8)'
-                ],
-                borderColor: [
-                    'rgba(7, 193, 96, 1)',
-                    'rgba(250, 81, 81, 1)'
-                ],
+                backgroundColor: [ChartTheme.SEMANTIC.income.bg, ChartTheme.SEMANTIC.expense.bg],
+                borderColor: [ChartTheme.SEMANTIC.income.border, ChartTheme.SEMANTIC.expense.border],
                 borderWidth: 2
             }]
         },
@@ -358,14 +355,7 @@ function renderPaymentMethodChart(stats) {
             labels: stats.map(s => s.name),
             datasets: [{
                 data: stats.map(s => s.totalAmount),
-                backgroundColor: [
-                    'rgba(7, 193, 96, 0.8)',
-                    'rgba(87, 107, 149, 0.8)',
-                    'rgba(255, 195, 0, 0.8)',
-                    'rgba(250, 81, 81, 0.8)',
-                    'rgba(153, 102, 255, 0.8)',
-                    'rgba(255, 159, 64, 0.8)'
-                ]
+                backgroundColor: ChartTheme.generatePalette(stats.length)
             }]
         },
         options: {
@@ -405,16 +395,7 @@ function renderTransactionTypeChart(stats) {
             labels: stats.map(s => s.name),
             datasets: [{
                 data: stats.map(s => s.count),
-                backgroundColor: [
-                    'rgba(7, 193, 96, 0.8)',
-                    'rgba(87, 107, 149, 0.8)',
-                    'rgba(255, 195, 0, 0.8)',
-                    'rgba(250, 81, 81, 0.8)',
-                    'rgba(153, 102, 255, 0.8)',
-                    'rgba(255, 159, 64, 0.8)',
-                    'rgba(75, 192, 192, 0.8)',
-                    'rgba(255, 99, 132, 0.8)'
-                ]
+                backgroundColor: ChartTheme.generatePalette(stats.length)
             }]
         },
         options: {
@@ -506,8 +487,8 @@ function renderCategoryChart(stats, sortBy) {
             datasets: [{
                 label: label,
                 data: stats.map(s => s[dataKey]),
-                backgroundColor: 'rgba(7, 193, 96, 0.8)',
-                borderColor: 'rgba(7, 193, 96, 1)',
+                backgroundColor: ChartTheme.PRIMARY.bg,
+                borderColor: ChartTheme.PRIMARY.border,
                 borderWidth: 2
             }]
         },
@@ -597,8 +578,8 @@ function renderTrendChart(trendData, dataType) {
         datasets.push({
             label: '收入',
             data: trendData.map(d => d.income),
-            borderColor: 'rgba(7, 193, 96, 1)',
-            backgroundColor: 'rgba(7, 193, 96, 0.2)',
+            borderColor: ChartTheme.SEMANTIC.income.border,
+            backgroundColor: ChartTheme.SEMANTIC.income.fill,
             tension: 0.3,
             fill: true
         });
@@ -608,8 +589,8 @@ function renderTrendChart(trendData, dataType) {
         datasets.push({
             label: '支出',
             data: trendData.map(d => d.expense),
-            borderColor: 'rgba(250, 81, 81, 1)',
-            backgroundColor: 'rgba(250, 81, 81, 0.2)',
+            borderColor: ChartTheme.SEMANTIC.expense.border,
+            backgroundColor: ChartTheme.SEMANTIC.expense.fill,
             tension: 0.3,
             fill: true
         });
