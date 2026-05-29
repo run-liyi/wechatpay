@@ -66,7 +66,9 @@ ipcMain.handle('select-file', async () => {
     return { success: false, message: '用户取消选择' };
   }
 
-  return { success: true, filePath: result.filePaths[0] };
+  const filePath = result.filePaths[0];
+  // 由主进程用 path.basename 计算文件名，跨平台一致（避免渲染层手工切分路径分隔符）
+  return { success: true, filePath, fileName: path.basename(filePath) };
 });
 
 ipcMain.handle('parse-bill-file', async (event, filePath) => {
