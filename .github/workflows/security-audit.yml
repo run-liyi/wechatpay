@@ -1,0 +1,27 @@
+name: security-audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # 每周一 03:17 UTC 定期审计，及时发现新披露的依赖漏洞
+    - cron: '17 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  npm-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # 不使用 npm ci：仓库当前未提交 lock 文件，install 后对生产依赖做高危审计
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Audit (fail on high/critical)
+        run: npm run audit:ci
