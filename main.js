@@ -74,23 +74,7 @@ ipcMain.handle('select-file', async () => {
 
 ipcMain.handle('parse-bill-file', async (event, filePath) => {
   try {
-    // CSV 常为 GBK 编码，默认 UTF-8 解码会乱码导致表头识别失败；按扩展名分流解析
-    const ext = path.extname(filePath).toLowerCase();
-    let workbook;
-    if (ext === '.csv') {
-      const text = readCsvAsUtf8(filePath);
-      workbook = XLSX.read(text, {
-        type: 'string',
-        cellDates: true,
-        dateNF: 'yyyy-mm-dd hh:mm:ss',
-        raw: false
-      });
-    } else {
-      workbook = XLSX.readFile(filePath, {
-        cellDates: true,
-        dateNF: 'yyyy-mm-dd hh:mm:ss'
-      });
-    }
+    const workbook = buildWorkbook(filePath);
 
     // 遍历工作簿的所有 sheet：账单可能被拆分到多个表（如分月导出），仅取第一个会漏数据
     let allRecords = [];
@@ -98,20 +82,25 @@ ipcMain.handle('parse-bill-file', async (event, filePath) => {
     let parsedSheetCount = 0;
 
     for (const sheetName of workbook.SheetNames) {
-      const worksheet = workbook.Sheets[sheetName];
-      const rawData = XLSX.utils.sheet_to_json(worksheet, {
-        header: 1,
-        raw: false,
-        dateNF: 'yyyy-mm-dd hh:mm:ss'
-      });
+      // 单个 sheet 异常时跳过而非整体失败，避免一张坏表拖垮多 sheet 文件
+      try {
+        const worksheet = workbook.Sheets[sheetName];
+        const rawData = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1,
+          raw: false,
+          dateNF: 'yyyy-mm-dd hh:mm:ss'
+        });
 
-      const parsed = extractSheetRecords(rawData);
-      if (!parsed) continue; // 该 sheet 无账单表头，跳过
+        const parsed = extractSheetRecords(rawData);
+        if (!parsed) continue; // 该 sheet 无账单表头，跳过
 
-      allRecords = allRecords.concat(parsed.records);
-      parsedSheetCount++;
-      // 元数据取首个含表头 sheet 的说明区
-      if (!metadata) metadata = extractMetadata(rawData, parsed.headerRowIndex);
+        allRecords = allRecords.concat(parsed.records);
+        parsedSheetCount++;
+        // 元数据取首个含表头 sheet 的说明区
+        if (!metadata) metadata = extractMetadata(rawData, parsed.headerRowIndex);
+      } catch (sheetErr) {
+        console.warn(`解析 sheet「${sheetName}」失败，已跳过：`, sheetErr && sheetErr.message);
+      }
     }
 
     if (parsedSheetCount === 0) {
@@ -161,6 +150,24 @@ ipcMain.handle('parse-bill-file', async (event, filePath) => {
 });
 
 // 在单个 sheet 的二维数组中定位表头并抽取交易记录；该 sheet 无账单表头时返回 null
+// 统一的工作簿读取入口：按扩展名分流 CSV 与 Excel，杜绝 CSV 误走 Excel 路径导致乱码。
+// CSV 先做编码转码再以字符串解析；若转码/解析失败（可能是误用 .csv 后缀的二进制 Excel），
+// 回退按文件读取，避免漏数据。
+function buildWorkbook(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const opts = { cellDates: true, dateNF: 'yyyy-mm-dd hh:mm:ss' };
+  if (ext === '.csv') {
+    try {
+      const text = readCsvAsUtf8(filePath);
+      return XLSX.read(text, { type: 'string', raw: false, ...opts });
+    } catch (e) {
+      console.warn('CSV 文本解析失败，回退按文件读取：', e && e.message);
+      return XLSX.readFile(filePath, opts);
+    }
+  }
+  return XLSX.readFile(filePath, opts);
+}
+
 // 读取 CSV 并统一转为 UTF-8 文本：处理 UTF-8 BOM 与 GBK/GB18030 中文编码
 function readCsvAsUtf8(filePath) {
   const buf = fs.readFileSync(filePath);
