@@ -396,23 +396,16 @@ function renderTransactionTypeChart(stats) {
 
 function renderStatusStats(stats) {
     const container = document.getElementById('statusStats');
-    
-    let html = '<table><thead><tr><th>状态</th><th>交易笔数</th><th>总金额</th><th>收入</th><th>支出</th></tr></thead><tbody>';
-    
-    stats.forEach(stat => {
-        html += `
-            <tr>
-                <td>${stat.name}</td>
-                <td>${stat.count}</td>
-                <td>¥${stat.totalAmount.toFixed(2)}</td>
-                <td class="amount-income">¥${stat.incomeAmount.toFixed(2)}</td>
-                <td class="amount-expense">¥${stat.expenseAmount.toFixed(2)}</td>
-            </tr>
-        `;
-    });
-    
-    html += '</tbody></table>';
-    container.innerHTML = html;
+
+    const rows = stats.map(stat => [
+        stat.name,
+        stat.count,
+        `¥${stat.totalAmount.toFixed(2)}`,
+        { text: `¥${stat.incomeAmount.toFixed(2)}`, className: 'amount-income' },
+        { text: `¥${stat.expenseAmount.toFixed(2)}`, className: 'amount-expense' }
+    ]);
+
+    renderTable(container, ['状态', '交易笔数', '总金额', '收入', '支出'], rows);
 }
 
 function updateCategoryView() {
@@ -519,24 +512,17 @@ function renderCategoryChart(stats, sortBy) {
 
 function renderCategoryTable(stats) {
     const container = document.getElementById('categoryTable');
-    
-    let html = '<table><thead><tr><th>排名</th><th>名称</th><th>交易次数</th><th>总金额</th><th>收入</th><th>支出</th></tr></thead><tbody>';
-    
-    stats.forEach((stat, index) => {
-        html += `
-            <tr>
-                <td>${index + 1}</td>
-                <td>${stat.name}</td>
-                <td>${stat.count}</td>
-                <td>¥${stat.totalAmount.toFixed(2)}</td>
-                <td class="amount-income">¥${stat.incomeAmount.toFixed(2)}</td>
-                <td class="amount-expense">¥${stat.expenseAmount.toFixed(2)}</td>
-            </tr>
-        `;
-    });
-    
-    html += '</tbody></table>';
-    container.innerHTML = html;
+
+    const rows = stats.map((stat, index) => [
+        index + 1,
+        stat.name,
+        stat.count,
+        `¥${stat.totalAmount.toFixed(2)}`,
+        { text: `¥${stat.incomeAmount.toFixed(2)}`, className: 'amount-income' },
+        { text: `¥${stat.expenseAmount.toFixed(2)}`, className: 'amount-expense' }
+    ]);
+
+    renderTable(container, ['排名', '名称', '交易次数', '总金额', '收入', '支出'], rows);
 }
 
 function updateTrendView() {
@@ -724,49 +710,32 @@ function resetDetailFilter() {
 
 function renderDetailTable(data) {
     const container = document.getElementById('detailTable');
-    
+
     if (data.length === 0) {
-        container.innerHTML = '<p style="padding: 2rem; text-align: center; color: var(--text-secondary);">暂无数据</p>';
+        container.replaceChildren();
+        const empty = document.createElement('p');
+        empty.style.cssText = 'padding: 2rem; text-align: center; color: var(--text-secondary);';
+        empty.textContent = '暂无数据';
+        container.appendChild(empty);
         return;
     }
-    
-    let html = `
-        <table>
-            <thead>
-                <tr>
-                    <th>交易时间</th>
-                    <th>交易类型</th>
-                    <th>交易对方</th>
-                    <th>商品</th>
-                    <th>收/支</th>
-                    <th>金额(元)</th>
-                    <th>支付方式</th>
-                    <th>当前状态</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-    
-    data.forEach(record => {
+
+    const rows = data.map(record => {
         const amountClass = record['收/支'] === '收入' ? 'amount-income' : 'amount-expense';
         const amount = parseFloat(record['金额(元)']) || 0;
-        
-        html += `
-            <tr>
-                <td>${record['交易时间'] || '-'}</td>
-                <td>${record['交易类型'] || '-'}</td>
-                <td>${record['交易对方'] || '-'}</td>
-                <td>${record['商品'] || '-'}</td>
-                <td>${record['收/支'] || '-'}</td>
-                <td class="${amountClass}">¥${amount.toFixed(2)}</td>
-                <td>${record['支付方式'] || '-'}</td>
-                <td>${record['当前状态'] || '-'}</td>
-            </tr>
-        `;
+        return [
+            record['交易时间'] || '-',
+            record['交易类型'] || '-',
+            record['交易对方'] || '-',
+            record['商品'] || '-',
+            record['收/支'] || '-',
+            { text: `¥${amount.toFixed(2)}`, className: amountClass },
+            record['支付方式'] || '-',
+            record['当前状态'] || '-'
+        ];
     });
-    
-    html += '</tbody></table>';
-    container.innerHTML = html;
+
+    renderTable(container, ['交易时间', '交易类型', '交易对方', '商品', '收/支', '金额(元)', '支付方式', '当前状态'], rows);
 }
 
 async function exportReport() {
@@ -841,4 +810,44 @@ function formatDate(date) {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+}
+
+/**
+ * 安全地把数据渲染为表格，避免 innerHTML 拼接导致的 XSS。
+ * 所有单元格内容均通过 textContent 写入，不会被解释为 HTML。
+ * @param {HTMLElement} container 目标容器
+ * @param {string[]} headers 表头文本数组
+ * @param {Array<Array<string|number|{text:string,className?:string}>>} rows 行数据
+ */
+function renderTable(container, headers, rows) {
+    const table = document.createElement('table');
+
+    const thead = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    headers.forEach(h => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    rows.forEach(cells => {
+        const tr = document.createElement('tr');
+        cells.forEach(cell => {
+            const td = document.createElement('td');
+            if (cell !== null && typeof cell === 'object') {
+                td.textContent = cell.text != null ? String(cell.text) : '';
+                if (cell.className) td.className = cell.className;
+            } else {
+                td.textContent = cell != null ? String(cell) : '';
+            }
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+
+    container.replaceChildren(table);
 }
