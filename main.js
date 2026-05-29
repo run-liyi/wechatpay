@@ -82,20 +82,25 @@ ipcMain.handle('parse-bill-file', async (event, filePath) => {
     let parsedSheetCount = 0;
 
     for (const sheetName of workbook.SheetNames) {
-      const worksheet = workbook.Sheets[sheetName];
-      const rawData = XLSX.utils.sheet_to_json(worksheet, {
-        header: 1,
-        raw: false,
-        dateNF: 'yyyy-mm-dd hh:mm:ss'
-      });
+      // 单个 sheet 异常时跳过而非整体失败，避免一张坏表拖垮多 sheet 文件
+      try {
+        const worksheet = workbook.Sheets[sheetName];
+        const rawData = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1,
+          raw: false,
+          dateNF: 'yyyy-mm-dd hh:mm:ss'
+        });
 
-      const parsed = extractSheetRecords(rawData);
-      if (!parsed) continue; // 该 sheet 无账单表头，跳过
+        const parsed = extractSheetRecords(rawData);
+        if (!parsed) continue; // 该 sheet 无账单表头，跳过
 
-      allRecords = allRecords.concat(parsed.records);
-      parsedSheetCount++;
-      // 元数据取首个含表头 sheet 的说明区
-      if (!metadata) metadata = extractMetadata(rawData, parsed.headerRowIndex);
+        allRecords = allRecords.concat(parsed.records);
+        parsedSheetCount++;
+        // 元数据取首个含表头 sheet 的说明区
+        if (!metadata) metadata = extractMetadata(rawData, parsed.headerRowIndex);
+      } catch (sheetErr) {
+        console.warn(`解析 sheet「${sheetName}」失败，已跳过：`, sheetErr && sheetErr.message);
+      }
     }
 
     if (parsedSheetCount === 0) {
