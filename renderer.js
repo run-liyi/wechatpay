@@ -5,6 +5,7 @@ let billData = [];
 let metadata = {};
 let currentView = 'welcome';
 let charts = {};
+let fileLoaded = false;
 
 document.addEventListener('DOMContentLoaded', () => {
     initializeApp();
@@ -72,14 +73,20 @@ function switchView(viewName) {
     if (targetView) {
         targetView.classList.add('active');
         currentView = viewName;
-        
-        if (billData.length > 0) {
+
+        // 已加载过文件后即更新视图（含 0 条记录时显示空状态）
+        if (fileLoaded) {
             updateViewData(viewName);
         }
     }
 }
 
 function updateViewData(viewName) {
+    // 解析出 0 条记录时，各视图显示统一空状态占位而非空图表/空白
+    if (!billData || billData.length === 0) {
+        renderEmptyStateForView(viewName);
+        return;
+    }
     switch(viewName) {
         case 'overview':
             updateOverviewView();
@@ -118,22 +125,32 @@ async function selectFile() {
     const parseResult = await ipcRenderer.invoke('parse-bill-file', result.filePath);
     
     if (!parseResult.success) {
-        fileStatus.textContent = `解析失败: ${parseResult.message}`;
+        // 按诊断分类给出具体原因，而非泛化提示
+        fileStatus.textContent = `解析失败：${parseResult.message}`;
         fileStatus.style.color = 'var(--danger-color)';
         showNotification('error', parseResult.message);
         return;
     }
-    
-    billData = parseResult.data;
-    metadata = parseResult.metadata;
-    
-    fileStatus.textContent = `解析成功！共 ${parseResult.totalRecords} 条记录`;
-    fileStatus.style.color = 'var(--success-color)';
-    
-    document.getElementById('exportReportBtn').disabled = false;
-    
-    showNotification('success', `成功加载 ${parseResult.totalRecords} 条账单记录`);
-    
+
+    billData = parseResult.data || [];
+    metadata = parseResult.metadata || {};
+    fileLoaded = true;
+
+    if (billData.length === 0) {
+        // 已识别格式但无有效记录：友好诊断 + 各视图空状态，不报错
+        const diagMsg = (parseResult.diagnostic && parseResult.diagnostic.message)
+            || '未找到有效交易记录';
+        fileStatus.textContent = diagMsg;
+        fileStatus.style.color = 'var(--warning-color)';
+        document.getElementById('exportReportBtn').disabled = true;
+        showNotification('info', diagMsg);
+    } else {
+        fileStatus.textContent = `解析成功！共 ${parseResult.totalRecords} 条记录`;
+        fileStatus.style.color = 'var(--success-color)';
+        document.getElementById('exportReportBtn').disabled = false;
+        showNotification('success', `成功加载 ${parseResult.totalRecords} 条账单记录`);
+    }
+
     switchView('overview');
     document.querySelector('.nav-item[data-view="overview"]').classList.add('active');
     document.querySelector('.nav-item[data-view="welcome"]')?.classList.remove('active');
@@ -207,6 +224,7 @@ function analyzeOverview(data) {
 
 function renderIncomeExpenseChart(analysis) {
     const ctx = document.getElementById('incomeExpenseChart');
+    showCanvas(ctx);
     
     if (charts.incomeExpense) {
         charts.incomeExpense.destroy();
@@ -304,6 +322,7 @@ function analyzeByDimension(data, dimension) {
 
 function renderPaymentMethodChart(stats) {
     const ctx = document.getElementById('paymentMethodChart');
+    showCanvas(ctx);
     
     if (charts.paymentMethod) {
         charts.paymentMethod.destroy();
@@ -350,6 +369,7 @@ function renderPaymentMethodChart(stats) {
 
 function renderTransactionTypeChart(stats) {
     const ctx = document.getElementById('transactionTypeChart');
+    showCanvas(ctx);
     
     if (charts.transactionType) {
         charts.transactionType.destroy();
@@ -446,6 +466,7 @@ function updateCategoryView() {
 
 function renderCategoryChart(stats, sortBy) {
     const ctx = document.getElementById('categoryChart');
+    showCanvas(ctx);
     
     if (charts.category) {
         charts.category.destroy();
@@ -589,6 +610,7 @@ function analyzeTrend(data, granularity) {
 
 function renderTrendChart(trendData, dataType) {
     const ctx = document.getElementById('trendChart');
+    showCanvas(ctx);
     
     if (charts.trend) {
         charts.trend.destroy();
@@ -889,6 +911,86 @@ function formatDate(date) {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+}
+
+// 构建统一的空状态占位节点（图标 + 主标题 + 可选引导）
+function createEmptyState(title, hint) {
+    const wrap = document.createElement('div');
+    wrap.className = 'empty-state';
+    const icon = document.createElement('div');
+    icon.className = 'empty-state-icon';
+    icon.textContent = '📭';
+    const t = document.createElement('p');
+    t.className = 'empty-state-title';
+    t.textContent = title || '暂无数据';
+    wrap.append(icon, t);
+    if (hint) {
+        const h = document.createElement('p');
+        h.className = 'empty-state-hint';
+        h.textContent = hint;
+        wrap.appendChild(h);
+    }
+    return wrap;
+}
+
+function setEmptyState(containerId, title, hint) {
+    const el = document.getElementById(containerId);
+    if (el) el.replaceChildren(createEmptyState(title, hint));
+}
+
+// 让 canvas 重新可见并移除其同级空状态占位（数据恢复时调用）
+function showCanvas(canvas) {
+    if (!canvas) return;
+    canvas.style.display = '';
+    const parent = canvas.parentElement;
+    if (parent) {
+        const es = parent.querySelector('.empty-state');
+        if (es) es.remove();
+    }
+}
+
+// 隐藏 canvas 并在其容器内显示空状态占位
+function setChartEmpty(canvasId, title) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    canvas.style.display = 'none';
+    const parent = canvas.parentElement;
+    if (parent && !parent.querySelector('.empty-state')) {
+        parent.appendChild(createEmptyState(title));
+    }
+}
+
+// 为指定视图渲染统一空状态（解析出 0 条记录时）
+function renderEmptyStateForView(viewName) {
+    const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    switch (viewName) {
+        case 'overview':
+            setText('totalIncome', '¥0.00'); setText('incomeCount', '0笔');
+            setText('totalExpense', '¥0.00'); setText('expenseCount', '0笔');
+            setText('netBalance', '¥0.00'); setText('balanceStatus', '-');
+            setText('totalTransactions', '0'); setText('dateRange', '-');
+            setText('metaNickname', metadata.nickname || '-');
+            setChartEmpty('incomeExpenseChart', '暂无数据');
+            break;
+        case 'analysis':
+            setChartEmpty('paymentMethodChart', '暂无数据');
+            setChartEmpty('transactionTypeChart', '暂无数据');
+            setEmptyState('statusStats', '暂无数据', '请导入包含交易记录的账单');
+            break;
+        case 'category':
+            setChartEmpty('categoryChart', '暂无数据');
+            setEmptyState('categoryTable', '暂无数据', '请导入包含交易记录的账单');
+            break;
+        case 'trend':
+            setChartEmpty('trendChart', '暂无数据');
+            updateTrendStats([]); // 复用 PR7 的空数据兜底
+            break;
+        case 'detail':
+            setEmptyState('detailTable', '暂无数据', '请导入包含交易记录的账单');
+            setText('filteredCount', '0');
+            setText('filteredAmount', '¥0.00');
+            break;
+    }
 }
 
 /**
