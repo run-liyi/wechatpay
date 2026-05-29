@@ -171,7 +171,7 @@ function analyzeOverview(data) {
     let dates = [];
     
     data.forEach(record => {
-        const amount = parseFloat(record['金额(元)']) || 0;
+        const amount = parseAmount(record['金额(元)']);
         const type = record['收/支'];
         const dateStr = record['交易时间'];
         
@@ -272,7 +272,7 @@ function analyzeByDimension(data, dimension) {
     
     data.forEach(record => {
         const key = record[dimension] || '未知';
-        const amount = parseFloat(record['金额(元)']) || 0;
+        const amount = parseAmount(record['金额(元)']);
         const type = record['收/支'];
         
         if (!stats[key]) {
@@ -567,7 +567,7 @@ function analyzeTrend(data, granularity) {
             };
         }
         
-        const amount = parseFloat(record['金额(元)']) || 0;
+        const amount = parseAmount(record['金额(元)']);
         const type = record['收/支'];
         
         if (type === '收入') {
@@ -692,7 +692,7 @@ function filterDetailData() {
     });
     
     const totalAmount = filtered.reduce((sum, record) => {
-        return sum + (parseFloat(record['金额(元)']) || 0);
+        return sum + parseAmount(record['金额(元)']);
     }, 0);
     
     document.getElementById('filteredCount').textContent = filtered.length;
@@ -722,7 +722,7 @@ function renderDetailTable(data) {
 
     const rows = data.map(record => {
         const amountClass = record['收/支'] === '收入' ? 'amount-income' : 'amount-expense';
-        const amount = parseFloat(record['金额(元)']) || 0;
+        const amount = parseAmount(record['金额(元)']);
         return [
             record['交易时间'] || '-',
             record['交易类型'] || '-',
