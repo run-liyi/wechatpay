@@ -174,13 +174,19 @@ function extractSheetRecords(rawData) {
   const headerRowIndex = findHeaderRow(rawData);
   if (headerRowIndex === -1) return null;
 
-  const headers = rawData[headerRowIndex];
+  // 列索引 -> 规范字段名（命中别名用规范名，否则保留去空白后的原始名），容忍列偏移
+  const headerRow = rawData[headerRowIndex];
+  const colMap = headerRow.map(cell => {
+    const norm = normalizeHeaderCell(cell);
+    return COLUMN_ALIASES[norm] || norm;
+  });
+
   const records = rawData.slice(headerRowIndex + 1)
-    .filter(row => row && row.length > 0 && row[0])
+    .filter(row => Array.isArray(row) && row.some(c => c !== '' && c != null))
     .map(row => {
       const record = {};
-      headers.forEach((header, index) => {
-        record[header] = row[index] || '';
+      colMap.forEach((name, index) => {
+        if (name) record[name] = row[index] != null ? row[index] : '';
       });
       return record;
     })
