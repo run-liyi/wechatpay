@@ -6,9 +6,11 @@ const iconv = require('iconv-lite');
 const { SecureStore } = require('./src/secure-store');
 const { parseSheets } = require('./src/import/parser');
 const { TransactionStore } = require('./src/store/db');
+const { ConfigStore } = require('./src/storage/store');
 
 let secureStore = null;
 let txStore = null;
+let configStore = null;
 
 let mainWindow;
 
@@ -82,6 +84,8 @@ app.whenReady().then(() => {
   secureStore = new SecureStore(path.join(app.getPath('userData'), 'bill-secure.enc'));
   // 本地交易持久化（再次打开免重导）
   txStore = new TransactionStore(path.join(app.getPath('userData'), 'transactions.json'));
+  // 用户配置/偏好持久化（预算、归类规则、界面偏好等）
+  configStore = new ConfigStore(path.join(app.getPath('userData'), 'config.json'));
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
@@ -348,6 +352,33 @@ ipcMain.handle('save-transactions', (event, payload) => {
 ipcMain.handle('clear-transactions', () => {
   try {
     txStore.clear();
+    return { success: true };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+});
+
+// ===== 用户配置 IPC =====
+ipcMain.handle('config-get-all', () => {
+  try {
+    return { success: true, config: configStore.getAll() };
+  } catch (e) {
+    return { success: false, message: e.message, config: {} };
+  }
+});
+
+ipcMain.handle('config-set', (event, key, value) => {
+  try {
+    configStore.set(key, value);
+    return { success: true };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+});
+
+ipcMain.handle('config-merge', (event, partial) => {
+  try {
+    configStore.merge(partial);
     return { success: true };
   } catch (e) {
     return { success: false, message: e.message };

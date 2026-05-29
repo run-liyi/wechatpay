@@ -24,6 +24,23 @@ contextBridge.exposeInMainWorld('billAPI', {
     return ipcRenderer.invoke('export-report', reportData);
   },
 
+  // 用户配置/偏好持久化
+  config: {
+    getAll: () => ipcRenderer.invoke('config-get-all'),
+    set: (key, value) => {
+      if (typeof key !== 'string' || key === '') {
+        return Promise.reject(new TypeError('config.set: key 必须为非空字符串'));
+      }
+      return ipcRenderer.invoke('config-set', key, value);
+    },
+    merge: (partial) => {
+      if (partial === null || typeof partial !== 'object') {
+        return Promise.reject(new TypeError('config.merge: 参数必须为对象'));
+      }
+      return ipcRenderer.invoke('config-merge', partial);
+    }
+  },
+
   // 本地交易持久化（再次打开免重导）
   loadTransactions: () => ipcRenderer.invoke('load-transactions'),
   saveTransactions: (transactions, metadata) => {

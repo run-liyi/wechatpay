@@ -10,11 +10,46 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeApp();
 });
 
-function initializeApp() {
+// 需要持久化的视图偏好下拉项
+const PREF_SELECTS = ['categoryDimension', 'categorySortBy', 'categoryTopN', 'trendGranularity', 'trendDataType'];
+let viewPrefs = {};
+
+async function initializeApp() {
     setupEventListeners();
     setupNavigation();
     setupModal();
-    loadPersistedData();
+    setupPreferencePersistence();
+    await restorePreferences();
+    await loadPersistedData();
+}
+
+// 启动时从配置层恢复视图偏好（重启后仍保留）
+async function restorePreferences() {
+    if (!window.billAPI || !window.billAPI.config) return;
+    try {
+        const res = await window.billAPI.config.getAll();
+        viewPrefs = (res && res.config && res.config.viewPrefs) || {};
+        PREF_SELECTS.forEach(id => {
+            const el = document.getElementById(id);
+            if (el && viewPrefs[id] != null) el.value = viewPrefs[id];
+        });
+    } catch (e) {
+        console.warn('恢复偏好失败:', e && e.message);
+    }
+}
+
+// 监听偏好下拉项变化并持久化
+function setupPreferencePersistence() {
+    PREF_SELECTS.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('change', () => {
+            viewPrefs[id] = el.value;
+            if (window.billAPI && window.billAPI.config) {
+                window.billAPI.config.set('viewPrefs', viewPrefs).catch(() => {});
+            }
+        });
+    });
 }
 
 // 启动后自动加载上次保存的交易数据，无需重新选文件
