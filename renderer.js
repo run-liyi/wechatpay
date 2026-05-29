@@ -1,5 +1,4 @@
-// 渲染进程不再直接 require('electron')；通过 preload 暴露的安全桥接调用 IPC。
-const ipcRenderer = window.electronAPI;
+// 渲染进程不再直接 require('electron')；通过 preload 暴露的最小化白名单 window.billAPI 调用 IPC。
 
 let billData = [];
 let metadata = {};
@@ -107,7 +106,7 @@ function updateViewData(viewName) {
 }
 
 async function selectFile() {
-    const result = await ipcRenderer.invoke('select-file');
+    const result = await window.billAPI.selectFile();
     
     if (!result.success) {
         return;
@@ -122,7 +121,7 @@ async function selectFile() {
     fileStatus.textContent = '正在解析...';
     fileInfo.classList.remove('hidden');
     
-    const parseResult = await ipcRenderer.invoke('parse-bill-file', result.filePath);
+    const parseResult = await window.billAPI.parseBill(result.filePath);
     
     if (!parseResult.success) {
         // 按诊断分类给出具体原因，而非泛化提示
@@ -889,7 +888,7 @@ async function exportReport() {
         }))
     };
     
-    const result = await ipcRenderer.invoke('export-report', reportData);
+    const result = await window.billAPI.exportReport(reportData);
     
     if (result.success) {
         showNotification('success', '报告导出成功！');
