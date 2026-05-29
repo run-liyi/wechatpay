@@ -1,6 +1,8 @@
 // ui.js — DOM 工具：toast 通知、空状态占位、安全表格渲染、canvas 显隐。
+import { state } from '../state.js';
+import { formatDate } from '../core/analytics.js';
 
-function showNotification(type, message) {
+export function showNotification(type, message) {
     console.log(`[${String(type).toUpperCase()}] ${message}`);
 
     const container = document.getElementById('toastContainer');
@@ -54,7 +56,7 @@ function showNotification(type, message) {
 // formatDate 已抽至 src/core/analytics.js（全局可用）
 
 // 构建统一的空状态占位节点（图标 + 主标题 + 可选引导）
-function createEmptyState(title, hint) {
+export function createEmptyState(title, hint) {
     const wrap = document.createElement('div');
     wrap.className = 'empty-state';
     const icon = document.createElement('div');
@@ -73,13 +75,13 @@ function createEmptyState(title, hint) {
     return wrap;
 }
 
-function setEmptyState(containerId, title, hint) {
+export function setEmptyState(containerId, title, hint) {
     const el = document.getElementById(containerId);
     if (el) el.replaceChildren(createEmptyState(title, hint));
 }
 
 // 让 canvas 重新可见并移除其同级空状态占位（数据恢复时调用）
-function showCanvas(canvas) {
+export function showCanvas(canvas) {
     if (!canvas) return;
     canvas.style.display = '';
     const parent = canvas.parentElement;
@@ -90,7 +92,7 @@ function showCanvas(canvas) {
 }
 
 // 隐藏 canvas 并在其容器内显示空状态占位
-function setChartEmpty(canvasId, title) {
+export function setChartEmpty(canvasId, title) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
     canvas.style.display = 'none';
@@ -101,7 +103,7 @@ function setChartEmpty(canvasId, title) {
 }
 
 // 为指定视图渲染统一空状态（解析出 0 条记录时）
-function renderTable(container, headers, rows) {
+export function renderTable(container, headers, rows) {
     const table = document.createElement('table');
 
     const thead = document.createElement('thead');

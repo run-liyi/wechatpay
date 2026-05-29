@@ -1,6 +1,12 @@
 // charts.js — 图表层：Chart.js 各图表渲染（配色取自 chart-theme，DOM 解耦计算用 core/analytics）。
+import Chart from 'chart.js/auto';
+import * as ChartTheme from '../../chart-theme.js';
+import { showCanvas } from '../dom/ui.js';
 
-function renderIncomeExpenseChart(analysis) {
+// Chart 实例缓存
+const charts = {};
+
+export function renderIncomeExpenseChart(analysis) {
     const ctx = document.getElementById('incomeExpenseChart');
     showCanvas(ctx);
     
@@ -49,7 +55,7 @@ function renderIncomeExpenseChart(analysis) {
     });
 }
 
-function renderPaymentMethodChart(stats) {
+export function renderPaymentMethodChart(stats) {
     const ctx = document.getElementById('paymentMethodChart');
     showCanvas(ctx);
     
@@ -89,7 +95,7 @@ function renderPaymentMethodChart(stats) {
     });
 }
 
-function renderTransactionTypeChart(stats) {
+export function renderTransactionTypeChart(stats) {
     const ctx = document.getElementById('transactionTypeChart');
     showCanvas(ctx);
     
@@ -129,7 +135,7 @@ function renderTransactionTypeChart(stats) {
     });
 }
 
-function renderCategoryChart(stats, sortBy) {
+export function renderCategoryChart(stats, sortBy) {
     const ctx = document.getElementById('categoryChart');
     showCanvas(ctx);
     
@@ -198,7 +204,7 @@ function renderCategoryChart(stats, sortBy) {
     });
 }
 
-function renderTrendChart(trendData, dataType) {
+export function renderTrendChart(trendData, dataType) {
     const ctx = document.getElementById('trendChart');
     showCanvas(ctx);
     
