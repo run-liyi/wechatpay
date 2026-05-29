@@ -14,6 +14,53 @@ function initializeApp() {
     setupEventListeners();
     setupNavigation();
     setupModal();
+    loadPersistedData();
+}
+
+// 启动后自动加载上次保存的交易数据，无需重新选文件
+async function loadPersistedData() {
+    if (!window.billAPI || !window.billAPI.loadTransactions) return;
+    try {
+        const res = await window.billAPI.loadTransactions();
+        if (!res || !res.success || !Array.isArray(res.transactions) || res.transactions.length === 0) {
+            return;
+        }
+        billData = res.transactions;
+        metadata = res.metadata || {};
+        fileLoaded = true;
+
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.querySelector('.file-name');
+        const fileStatus = document.querySelector('.file-status');
+        if (fileName) fileName.textContent = '上次保存的数据';
+        if (fileStatus) {
+            fileStatus.textContent = `已自动加载 ${billData.length} 条记录`;
+            fileStatus.style.color = 'var(--success-color)';
+        }
+        if (fileInfo) fileInfo.classList.remove('hidden');
+        const exportBtn = document.getElementById('exportReportBtn');
+        if (exportBtn) exportBtn.disabled = false;
+
+        switchView('overview');
+        document.querySelector('.nav-item[data-view="overview"]').classList.add('active');
+        document.querySelector('.nav-item[data-view="welcome"]')?.classList.remove('active');
+        showNotification('info', `已自动加载上次保存的 ${billData.length} 条记录`);
+    } catch (e) {
+        console.warn('加载本地数据失败:', e && e.message);
+    }
+}
+
+// 将当前数据持久化到本地（按交易单号去重 upsert）
+async function persistData() {
+    if (!window.billAPI || !window.billAPI.saveTransactions) return;
+    try {
+        const res = await window.billAPI.saveTransactions(billData, metadata);
+        if (res && res.success && res.added != null) {
+            showNotification('info', `已保存到本地（新增 ${res.added} 条，共 ${res.total} 条）`);
+        }
+    } catch (e) {
+        console.warn('保存本地数据失败:', e && e.message);
+    }
 }
 
 function setupEventListeners() {
@@ -148,6 +195,8 @@ async function selectFile() {
         fileStatus.style.color = 'var(--success-color)';
         document.getElementById('exportReportBtn').disabled = false;
         showNotification('success', `成功加载 ${parseResult.totalRecords} 条账单记录`);
+        // 持久化到本地，下次打开免重导（按交易单号去重 upsert）
+        persistData();
     }
 
     switchView('overview');
