@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const XLSX = require('xlsx');
@@ -35,7 +35,30 @@ function createWindow() {
   });
 }
 
+// 严格内容安全策略：禁止 inline/远程脚本，仅允许本地资源；图表已本地化，无需任何外部域。
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'", // 应用使用外部 styles.css，inline 仅用于元素 style 属性
+  "img-src 'self' data:",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+  "frame-ancestors 'none'"
+].join('; ');
+
 app.whenReady().then(() => {
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [CSP]
+      }
+    });
+  });
+
   createWindow();
 
   app.on('activate', () => {
