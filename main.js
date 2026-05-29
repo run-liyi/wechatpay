@@ -127,14 +127,51 @@ ipcMain.handle('parse-bill-file', async (event, filePath) => {
 });
 
 // 在单个 sheet 的二维数组中定位表头并抽取交易记录；该 sheet 无账单表头时返回 null
-function extractSheetRecords(rawData) {
-  let headerRowIndex = -1;
+// 表头单元格归一化：去除所有空白(含全角空格)、全角括号转半角，便于容忍变体与列偏移
+function normalizeHeaderCell(cell) {
+  if (cell == null) return '';
+  return String(cell)
+    .replace(/[\s　]/g, '')
+    .replace(/（/g, '(')
+    .replace(/）/g, ')');
+}
+
+// 列别名 -> 规范字段名（键为归一化后的形式）
+const COLUMN_ALIASES = {
+  '交易时间': '交易时间', '交易日期': '交易时间', '时间': '交易时间',
+  '交易类型': '交易类型', '交易分类': '交易类型', '类型': '交易类型',
+  '交易对方': '交易对方', '对方': '交易对方', '交易对方名称': '交易对方', '商户名称': '交易对方',
+  '商品': '商品', '商品说明': '商品', '商品名称': '商品',
+  '收/支': '收/支', '收支': '收/支', '收入/支出': '收/支', '收支类型': '收/支',
+  '金额(元)': '金额(元)', '金额': '金额(元)', '交易金额': '金额(元)', '金额(元)': '金额(元)',
+  '支付方式': '支付方式', '支付渠道': '支付方式', '收/付款方式': '支付方式', '付款方式': '支付方式',
+  '当前状态': '当前状态', '交易状态': '当前状态', '状态': '当前状态',
+  '交易单号': '交易单号', '订单号': '交易单号', '微信支付订单号': '交易单号', '交易订单号': '交易单号',
+  '商户单号': '商户单号', '商户订单号': '商户单号',
+  '备注': '备注'
+};
+
+// 逐行扫描定位表头：命中规范列达到阈值且包含「交易时间」即判定为表头行（容忍序号列/空白/变体）
+function findHeaderRow(rawData) {
   for (let i = 0; i < rawData.length; i++) {
-    if (rawData[i] && rawData[i][0] === '交易时间') {
-      headerRowIndex = i;
-      break;
+    const row = rawData[i];
+    if (!Array.isArray(row)) continue;
+    let hits = 0;
+    let hasTime = false;
+    for (const cell of row) {
+      const canon = COLUMN_ALIASES[normalizeHeaderCell(cell)];
+      if (canon) {
+        hits++;
+        if (canon === '交易时间') hasTime = true;
+      }
     }
+    if (hasTime && hits >= 3) return i;
   }
+  return -1;
+}
+
+function extractSheetRecords(rawData) {
+  const headerRowIndex = findHeaderRow(rawData);
   if (headerRowIndex === -1) return null;
 
   const headers = rawData[headerRowIndex];
