@@ -185,10 +185,11 @@ function analyzeOverview(data) {
         }
         
         if (dateStr) {
-            dates.push(new Date(dateStr));
+            const d = parseDate(dateStr);
+            if (d) dates.push(d); // 无法解析的日期安全跳过，不计入范围
         }
     });
-    
+
     dates.sort((a, b) => a - b);
     const dateRange = {
         start: dates.length > 0 ? formatDate(dates[0]) : '-',
@@ -541,8 +542,9 @@ function analyzeTrend(data, granularity) {
     data.forEach(record => {
         const dateStr = record['交易时间'];
         if (!dateStr) return;
-        
-        const date = new Date(dateStr);
+
+        const date = parseDate(dateStr);
+        if (!date) return; // 无法解析的日期不计入趋势聚合
         let key;
         
         switch(granularity) {
