@@ -138,6 +138,50 @@ ipcMain.handle('parse-bill-file', async (event, filePath) => {
   }
 });
 
+// 在单个 sheet 的二维数组中定位表头并抽取交易记录；该 sheet 无账单表头时返回 null
+function extractSheetRecords(rawData) {
+  let headerRowIndex = -1;
+  for (let i = 0; i < rawData.length; i++) {
+    if (rawData[i] && rawData[i][0] === '交易时间') {
+      headerRowIndex = i;
+      break;
+    }
+  }
+  if (headerRowIndex === -1) return null;
+
+  const headers = rawData[headerRowIndex];
+  const records = rawData.slice(headerRowIndex + 1)
+    .filter(row => row && row.length > 0 && row[0])
+    .map(row => {
+      const record = {};
+      headers.forEach((header, index) => {
+        record[header] = row[index] || '';
+      });
+      return record;
+    })
+    .filter(record => {
+      return record['交易时间'] &&
+             record['交易时间'] !== '/' &&
+             !record['交易时间'].toString().includes('---');
+    });
+
+  return { headerRowIndex, records };
+}
+
+// 跨 sheet 合并后去重：优先按「交易单号」，缺单号时回退到 时间+对方+金额+收支 组合键
+function dedupeRecords(records) {
+  const seen = new Set();
+  const out = [];
+  for (const r of records) {
+    const orderNo = (r['交易单号'] || '').toString().trim();
+    const key = orderNo || [r['交易时间'], r['交易对方'], r['金额(元)'], r['收/支']].join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(r);
+  }
+  return out;
+}
+
 function extractMetadata(rawData, headerRowIndex) {
   const metadata = {
     nickname: '',
