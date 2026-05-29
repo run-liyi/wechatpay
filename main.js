@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, session } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, session, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const XLSX = require('xlsx');
@@ -16,7 +16,8 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: true
+      sandbox: true,
+      webviewTag: false
     },
     icon: path.join(__dirname, 'assets', 'icon.png'),
     title: '微信账单分析工具',
@@ -25,6 +26,27 @@ function createWindow() {
   });
 
   mainWindow.loadFile('index.html');
+
+  // 限制导航：仅允许本地 file:// 协议，阻止被脚本注入或误操作导航到外部页面
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!url.startsWith('file://')) {
+      event.preventDefault();
+      console.warn('已阻止导航到外部地址:', url);
+    }
+  });
+
+  // 拒绝在应用内打开新窗口；仅 http(s) 白名单链接交由系统默认浏览器打开
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+
+  // 禁止附加 <webview>，杜绝嵌入式外部内容
+  mainWindow.webContents.on('will-attach-webview', (event) => {
+    event.preventDefault();
+  });
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
