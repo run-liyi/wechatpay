@@ -1,4 +1,5 @@
-const { ipcRenderer } = require('electron');
+// 渲染进程不再直接 require('electron')；通过 preload 暴露的安全桥接调用 IPC。
+const ipcRenderer = window.electronAPI;
 
 let billData = [];
 let metadata = {};
