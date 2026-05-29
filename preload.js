@@ -22,5 +22,31 @@ contextBridge.exposeInMainWorld('billAPI', {
       return Promise.reject(new TypeError('exportReport: reportData 必须为对象'));
     }
     return ipcRenderer.invoke('export-report', reportData);
+  },
+
+  // 静态加密存储（主密码保护）
+  secure: {
+    status: () => ipcRenderer.invoke('secure-status'),
+    setPassword: (password) => {
+      if (typeof password !== 'string' || password.length === 0) {
+        return Promise.reject(new TypeError('secure.setPassword: 主密码必须为非空字符串'));
+      }
+      return ipcRenderer.invoke('secure-set-password', password);
+    },
+    unlock: (password) => {
+      if (typeof password !== 'string') {
+        return Promise.reject(new TypeError('secure.unlock: 主密码必须为字符串'));
+      }
+      return ipcRenderer.invoke('secure-unlock', password);
+    },
+    lock: () => ipcRenderer.invoke('secure-lock'),
+    save: (data) => {
+      if (data === null || typeof data !== 'object') {
+        return Promise.reject(new TypeError('secure.save: data 必须为对象'));
+      }
+      return ipcRenderer.invoke('secure-save', data);
+    },
+    load: () => ipcRenderer.invoke('secure-load'),
+    wipe: () => ipcRenderer.invoke('secure-wipe')
   }
 });
