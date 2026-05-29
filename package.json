@@ -14,7 +14,8 @@
     "pack": "electron-packager . 微信账单分析工具 --platform=win32 --arch=x64 --out=release --overwrite --icon=assets/icon.ico",
     "audit": "npm audit",
     "audit:ci": "npm audit --omit=dev --audit-level=high",
-    "test": "node --test"
+    "test": "node --test",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "wechat",
@@ -30,6 +31,7 @@
     "electron": "^28.0.0",
     "electron-builder": "^24.9.1",
     "electron-packager": "^17.1.2",
+    "typescript": "^5.9.3",
     "vite": "^5.4.21"
   },
   "dependencies": {
