@@ -33,7 +33,15 @@ function createWindow() {
     show: false
   });
 
-  mainWindow.loadFile('index.html');
+  // 优先加载 Vite 构建产物（dist）；开发热更新时加载 Vite dev server；否则回退源 index.html
+  const distIndex = path.join(__dirname, 'dist', 'index.html');
+  if (process.env.VITE_DEV_SERVER_URL) {
+    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+  } else if (fs.existsSync(distIndex)) {
+    mainWindow.loadFile(distIndex);
+  } else {
+    mainWindow.loadFile('index.html');
+  }
 
   // 限制导航：仅允许本地 file:// 协议，阻止被脚本注入或误操作导航到外部页面
   mainWindow.webContents.on('will-navigate', (event, url) => {
