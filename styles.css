@@ -834,3 +834,82 @@ body {
     font-size: 0.85rem;
     color: var(--text-secondary);
 }
+
+/* ===== 明细虚拟滚动表 ===== */
+.vtable {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.vtable-header,
+.vtable-row {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1.4fr 1.4fr 0.7fr 1fr 1.2fr 1fr;
+}
+
+.vtable-header {
+    background: var(--bg-primary);
+    font-weight: 600;
+    border-bottom: 2px solid var(--border-color);
+    /* 为 body 滚动条预留，保持列对齐 */
+    scrollbar-gutter: stable;
+}
+
+.vtable-body {
+    max-height: 480px;
+    overflow-y: auto;
+    position: relative;
+    scrollbar-gutter: stable;
+}
+
+.vtable-spacer {
+    position: relative;
+    width: 100%;
+}
+
+.vtable-viewport {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+}
+
+.vtable-row {
+    height: 40px;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.vtable-row.odd {
+    background: var(--bg-primary);
+}
+
+.vtable-cell {
+    padding: 0 0.6rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.875rem;
+}
+
+.vtable-th {
+    cursor: pointer;
+    user-select: none;
+    padding: 0.6rem;
+}
+
+.vtable-th:hover {
+    color: var(--primary-color);
+}
+
+.vtable-th .sort-arrow {
+    opacity: 0.4;
+    margin-left: 2px;
+}
+
+.vtable-th.sort-asc .sort-arrow,
+.vtable-th.sort-desc .sort-arrow {
+    opacity: 1;
+    color: var(--primary-color);
+}
