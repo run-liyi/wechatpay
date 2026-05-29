@@ -3,6 +3,9 @@ const path = require('path');
 const fs = require('fs');
 const XLSX = require('xlsx');
 const iconv = require('iconv-lite');
+const { SecureStore } = require('./src/secure-store');
+
+let secureStore = null;
 
 let mainWindow;
 
@@ -72,6 +75,9 @@ const CSP = [
 ].join('; ');
 
 app.whenReady().then(() => {
+  // 静态加密存储置于 userData 目录，落盘内容全程密文
+  secureStore = new SecureStore(path.join(app.getPath('userData'), 'bill-secure.enc'));
+
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
@@ -438,4 +444,50 @@ ipcMain.handle('export-report', async (event, reportData) => {
       message: `导出失败: ${error.message}`
     };
   }
+});
+
+// ===== 静态加密存储 IPC =====
+ipcMain.handle('secure-status', () => ({
+  initialized: secureStore.isInitialized(),
+  unlocked: secureStore.isUnlocked()
+}));
+
+ipcMain.handle('secure-set-password', (event, password) => {
+  try {
+    secureStore.initialize(password);
+    return { success: true };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+});
+
+ipcMain.handle('secure-unlock', (event, password) => ({
+  success: secureStore.unlock(password)
+}));
+
+ipcMain.handle('secure-lock', () => {
+  secureStore.lock();
+  return { success: true };
+});
+
+ipcMain.handle('secure-save', (event, data) => {
+  try {
+    secureStore.save(data);
+    return { success: true };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+});
+
+ipcMain.handle('secure-load', () => {
+  try {
+    return { success: true, data: secureStore.load() };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+});
+
+ipcMain.handle('secure-wipe', () => {
+  secureStore.wipe();
+  return { success: true };
 });
